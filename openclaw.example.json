@@ -1,0 +1,85 @@
+{
+    "update": {
+        "channel": "stable"
+    },
+
+    "auth": {
+        "profiles": {
+            "openrouter:default": {
+                "provider": "openrouter",
+                "mode": "api_key"
+            }
+        }
+    },
+
+    "agents": {
+        "defaults": {
+            "workspace": ".",
+            "model": {
+                "primary": "anthropic/claude-sonnet-4-6",
+                "fallbacks": [
+                    "google/gemini-2.5-flash"
+                ]
+            },
+            "models": {
+                "anthropic/claude-sonnet-4-6": {
+                    "alias": "sonnet"
+                },
+                "google/gemini-2.5-flash": {
+                    "alias": "flash"
+                }
+            },
+            "maxConcurrent": 2
+        }
+    },
+
+    "channels": {
+        "telegram": {
+            "enabled": true,
+            "botToken": "<YOUR_TELEGRAM_BOT_TOKEN>",
+            "dmPolicy": "whitelist",
+            "whitelist": [
+                123456789
+            ],
+            "groupPolicy": "disabled",
+            "streamMode": "partial"
+        }
+    },
+
+    "gateway": {
+        "port": 3001,
+        "mode": "local",
+        "bind": "loopback"
+    },
+
+    "plugins": {
+        "entries": {
+            "telegram": {
+                "enabled": true
+            }
+        }
+    },
+
+    "skills": {
+        "load": {
+            "extraDirs": [
+                "./tools"
+            ]
+        },
+        "entries": {
+            "calculate-chart": {
+                "enabled": true
+            },
+            "query-bphs-rag": {
+                "enabled": true
+            },
+            "check-rate-limit": {
+                "enabled": true
+            }
+        }
+    },
+
+    "logging": {
+        "redactSensitive": "tools"
+    }
+}

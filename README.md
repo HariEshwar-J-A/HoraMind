@@ -13,45 +13,53 @@ HoraMind is an autonomous Vedic Astrology AI agent built on the [OpenClaw](https
 - **Conflict Resolution Matrix:** Hard-wired priority rules ensure the AI never contradicts itself: Dasha Trigger → Shadbala → Neecha Bhanga → D1 Primacy.
 - **Persistent Karmic Blueprints:** Per-user Markdown files so the agent remembers your chart across every session.
 - **Rate Limiting:** 5 open-ended queries per user per day (resets at midnight EST).
-- **Telegram Native:** Single-user DM bot. No group chats. No command menus — pure conversation.
+- **Telegram Native:** Whitelist-gated DM bot. No group chats. No command menus — pure conversation.
 
 ---
 
 ## Architecture
 
 ```
-HoraMind/
-├── openclaw.json              ← OpenClaw gateway config (models, channels, skills)
-├── .env                       ← API keys (gitignored — copy from .env.example)
-├── .env.example               ← Template
-├── package.json               ← Node.js dependencies
+HoraMind/                          ← OpenClaw workspace root (workspace: ".")
 │
-├── agent_config/              ← OpenClaw workspace directory
-│   ├── SOUL.md                ← Core identity + Conflict Resolution Matrix
-│   ├── AGENTS.md              ← Operating instructions + onboarding pipeline
-│   ├── IDENTITY.md            ← Agent name, emoji, communication style
-│   └── TOOLS.md               ← Tool registry and invocation guide
+├── openclaw.json                  ← Gateway config — gitignored, copy from .env.example
+├── openclaw.example.json          ← Committed template for openclaw.json
+├── .env                           ← API keys — gitignored, copy from .env.example
+├── .env.example                   ← Committed template for .env
+├── start.sh                       ← Launcher: sources .env, sets CWD, starts gateway
+├── package.json                   ← Node.js dependencies + npm scripts
 │
-├── tools/                     ← Custom OpenClaw skills
-│   ├── calculate_chart.js     ← node-jhora switchboard (D1/Vargas/AVarga/Dasha)
-│   ├── query_bphs_rag.js      ← ChromaDB semantic search (WASM embeddings)
-│   ├── check_rate_limit.js    ← Per-user daily quota (5 queries/day, EST reset)
-│   ├── calculate-chart/       ← Skill definition
-│   │   └── SKILL.md
-│   ├── query-bphs-rag/        ← Skill definition
-│   │   └── SKILL.md
-│   └── check-rate-limit/      ← Skill definition
-│       └── SKILL.md
+├── SOUL.md                        ← Agent core identity + Conflict Resolution Matrix
+├── AGENTS.md                      ← Operating instructions + onboarding pipeline
+├── IDENTITY.md                    ← Agent name, emoji, communication style
+├── TOOLS.md                       ← Tool registry and invocation guide
 │
-├── core/                      ← Mount node-jhora monorepo here (submodule or symlink)
-├── users/                     ← Per-user data (gitignored)
+├── tools/                         ← Custom OpenClaw skills
+│   ├── calculate_chart.js         ← node-jhora switchboard (CORE/VARGAS/ASHTAKAVARGA/DASHA)
+│   ├── query_bphs_rag.js          ← ChromaDB semantic search (WASM embeddings)
+│   ├── check_rate_limit.js        ← Per-user daily quota (5 queries/day, EST reset)
+│   ├── calculate-chart/
+│   │   └── SKILL.md               ← OpenClaw skill definition
+│   ├── query-bphs-rag/
+│   │   └── SKILL.md               ← OpenClaw skill definition
+│   └── check-rate-limit/
+│       └── SKILL.md               ← OpenClaw skill definition
+│
+├── agent_config/                  ← Legacy config directory (not the workspace)
+│   ├── openclaw_config.json       ← Reference notes (not read by OpenClaw directly)
+│   └── preferences.md             ← Reference notes
+│
+├── core/                          ← Mount node-jhora monorepo here (submodule or symlink)
+│
+├── users/                         ← Per-user data — gitignored, auto-created at runtime
 │   └── {telegram_id}/
-│       ├── 01_core_foundation.md
-│       ├── 02_varga_analysis.md
-│       ├── 03_ashtakavarga.md
-│       ├── 04_dasha_timeline.md
-│       └── master_karmic_blueprint.md
-└── rate_limits.json           ← Rate limit state (gitignored)
+│       ├── 01_core_foundation.md  ← D1, D9, Shadbala analysis
+│       ├── 02_varga_analysis.md   ← D2–D30 divisional charts
+│       ├── 03_ashtakavarga.md     ← SAV transit grid
+│       ├── 04_dasha_timeline.md   ← Vimshottari Dasha tree
+│       └── master_karmic_blueprint.md  ← Final synthesis — read on every return visit
+│
+└── rate_limits.json               ← Rate limit state — gitignored, auto-created at runtime
 ```
 
 ---
@@ -62,124 +70,137 @@ HoraMind/
 |---|---|
 | Node.js ≥ 22 | Required by OpenClaw |
 | npm ≥ 10 | For package management |
-| [node-jhora](https://github.com/HariEshwar-J-A/node-jhora) monorepo | Built adjacent to this repo (`../node-jhora/`) |
-| [JyotishBase](https://github.com/HariEshwar-J-A/JyotishBase) ChromaDB | Running on `localhost:8000` (or configured URL) |
-| OpenRouter account | API key for LLM access |
-| Telegram Bot Token | From `@BotFather` — see setup guide below |
+| [node-jhora](https://github.com/HariEshwar-J-A/node-jhora) monorepo | Built adjacent at `../node-jhora/` |
+| [JyotishBase](https://github.com/HariEshwar-J-A/JyotishBase) ChromaDB | Running and accessible at your configured URL |
+| OpenRouter account | API key for LLM access (Claude + Gemini) |
+| Telegram Bot Token | From `@BotFather` — see Step 1 below |
 
 ---
 
 ## Step 1: Create Your Telegram Bot with @BotFather
 
-This is the only Telegram configuration needed before running HoraMind.
-
 ### 1.1 — Open BotFather
 
-Open Telegram and search for **`@BotFather`** (the official blue-tick bot from Telegram). Start a chat with it.
+Open Telegram and search for **`@BotFather`** (the official blue-tick Telegram bot). Start a chat.
 
 ### 1.2 — Create a New Bot
 
-Send the `/newbot` command:
+Send the `/newbot` command and follow the prompts:
 
 ```
 /newbot
 ```
 
-BotFather will ask you two things:
+BotFather will ask for:
 
-**a) A display name for your bot** — this is the friendly name users see in their chat list.
+**a) A display name** — shown in the chat list.
 Example: `HoraMind Vedic Astrologer`
 
-**b) A username for your bot** — must end in `bot`, no spaces, globally unique.
+**b) A username** — must end in `bot`, no spaces, globally unique.
 Example: `horamind_vedic_bot` or `HoraMindBot`
 
 ### 1.3 — Save Your Token
 
-BotFather will reply with something like:
+BotFather will reply with a token like:
 
 ```
-Done! Congratulations on your new bot. You will find it at t.me/HoraMindBot.
-You can now add a description, about section and profile picture for your bot,
-see /help for a list of commands.
-
 Use this token to access the HTTP API:
 7123456789:AAHdqTcvCH1vGWJxfSeofSs35NVi4jsaz38
-Keep your token secure and store it safely, it can be used by anyone to control your bot.
+Keep your token secure and store it safely.
 ```
 
-**Copy the token.** This is your `TELEGRAM_BOT_TOKEN`. Keep it secret.
+**Copy the token.** You will paste it directly into `openclaw.json` in Step 3.
 
-### 1.4 — Optional: Configure Your Bot (Recommended)
+### 1.4 — Optional: Polish the Bot Profile (Recommended)
 
-While you're in BotFather, run these optional commands to polish the experience:
-
-**Set a description** (shown on the bot's profile page):
 ```
 /setdescription
-```
-Suggested: `A precision Vedic Astrology advisor. Send your birth details to receive your complete Jyotish reading based on the BPHS classical texts.`
+→ A precision Vedic Astrology advisor. Send your birth details to receive your
+  complete Jyotish reading based on classical BPHS texts.
 
-**Set an "About" text** (shown before the user starts a chat):
-```
 /setabouttext
-```
-Suggested: `HoraMind analyses your birth chart using the node-jhora engine and Brihat Parashara Hora Shastra. 5 free queries/day.`
+→ HoraMind analyses your birth chart using the node-jhora engine and
+  Brihat Parashara Hora Shastra. 5 free queries/day.
 
-**Disable join groups** (HoraMind is DM-only):
-```
 /setjoingroups
-→ Choose: Disable
-```
+→ Disable
 
-**Set privacy mode** (so the bot only sees direct messages, not all group messages):
-```
 /setprivacy
-→ Choose: Enable
+→ Enable
 ```
 
 ---
 
-## Step 2: Configure Environment Variables
+## Step 2: Install Dependencies
 
 ```bash
-cp .env.example .env
-```
-
-Edit `.env` with your real values:
-
-```env
-# From OpenRouter (https://openrouter.ai/keys)
-OPENROUTER_API_KEY=sk-or-v1-your-key-here
-
-# From BotFather (Step 1 above)
-TELEGRAM_BOT_TOKEN=7123456789:AAHdqTcvCH1vGWJxfSeofSs35NVi4jsaz38
-
-# ChromaDB URL (where JyotishBase is running)
-CHROMA_URL=http://localhost:8000
-```
-
----
-
-## Step 3: Install Dependencies
-
-```bash
-# Install HoraMind's own dependencies
+# HoraMind's own Node.js packages
 npm install
 
-# Install OpenClaw globally (required to run the gateway)
+# OpenClaw gateway (global — required to run the agent)
 npm install -g openclaw@latest
 ```
 
-Verify OpenClaw is available:
+Verify:
 ```bash
 openclaw --version
 ```
 
 ---
 
-## Step 4: Ensure node-jhora is Built
+## Step 3: Configure `openclaw.json`
 
-The `calculate_chart.js` tool resolves node-jhora packages from `../node-jhora/packages/*/dist/`. Make sure the monorepo is built:
+`openclaw.json` is **gitignored** because it holds your real bot token. Copy the template:
+
+```bash
+cp openclaw.example.json openclaw.json
+```
+
+Open `openclaw.json` and make two edits:
+
+**a) Set your bot token** (from Step 1.3):
+```json
+"botToken": "7123456789:AAHdqTcvCH1vGWJxfSeofSs35NVi4jsaz38"
+```
+
+**b) Set your Telegram user ID** in the whitelist (find yours by messaging `@userinfobot`):
+```json
+"whitelist": [123456789]
+```
+
+Everything else in `openclaw.json` can stay as-is. The `anthropic/claude-sonnet-4-6` and `google/gemini-2.5-flash` models are routed through OpenRouter automatically using the `OPENROUTER_API_KEY` from your `.env`.
+
+---
+
+## Step 4: Configure `.env`
+
+`.env` is **gitignored**. Copy the template:
+
+```bash
+cp .env.example .env
+```
+
+Fill in your values:
+
+```env
+# OpenRouter API key — https://openrouter.ai/keys
+OPENROUTER_API_KEY=sk-or-v1-your-key-here
+
+# ChromaDB URL (JyotishBase vector DB)
+# Use localhost:8000 if running on the same machine,
+# or your VM's LAN IP if running remotely.
+CHROMA_URL=http://localhost:8000
+```
+
+> **Note:** `TELEGRAM_BOT_TOKEN` is NOT in `.env` — it lives directly in `openclaw.json`
+> because OpenClaw reads channel credentials from its own config, not the environment.
+
+---
+
+## Step 5: Build node-jhora
+
+`calculate_chart.js` resolves node-jhora packages from `../node-jhora/packages/*/dist/`.
+Make sure the monorepo is built before starting HoraMind:
 
 ```bash
 cd ../node-jhora
@@ -190,74 +211,133 @@ cd ../HoraMind
 
 ---
 
-## Step 5: Start JyotishBase ChromaDB
+## Step 6: Start JyotishBase ChromaDB
 
-The `query_bphs_rag.js` tool connects to ChromaDB. Start the JyotishBase database:
+`query_bphs_rag.js` connects to ChromaDB at your configured `CHROMA_URL`.
+Start the database before launching HoraMind:
 
 ```bash
-# In the JyotishBase directory
 cd ../JyotishBase
 chroma run --path ./chroma_data --host 0.0.0.0 --port 8000
 ```
 
-Leave this running in a separate terminal or configure it as a background service.
+Leave this running in a separate terminal, or set it up as a background service (see Production section below).
 
 ---
 
-## Step 6: Start HoraMind
+## Step 7: Launch HoraMind
 
 ```bash
-# From the HoraMind directory
-OPENCLAW_CONFIG_PATH=./openclaw.json openclaw gateway
-```
+# Make the launcher executable (one-time)
+chmod +x start.sh
 
-Or use the npm start script (after setting it up in package.json):
-```bash
+# Start the gateway
 npm start
 ```
 
-You should see output like:
+`start.sh` does three things before handing off to OpenClaw:
+1. Changes directory to the HoraMind root so all relative paths resolve correctly.
+2. Sources `.env` — makes `OPENROUTER_API_KEY` and `CHROMA_URL` available to the process.
+3. Validates that `OPENROUTER_API_KEY` is set, then starts the gateway.
+
+You should see:
 ```
+[horamind] Loaded .env
+[horamind] Starting OpenClaw gateway...
+[horamind] Workspace : /home/hari/agents/astrology/HoraMind
+[horamind] Config    : /home/hari/agents/astrology/HoraMind/openclaw.json
 [openclaw] Gateway starting on 127.0.0.1:3001
 [openclaw] Telegram channel: connected (@HoraMindBot)
 [openclaw] Skills loaded: calculate-chart, query-bphs-rag, check-rate-limit
-[openclaw] Agent workspace: ./agent_config
-[openclaw] Default model: claude-3-7-sonnet (via OpenRouter)
+[openclaw] Agent workspace: /home/hari/agents/astrology/HoraMind
+[openclaw] Default model: anthropic/claude-sonnet-4-6 (via OpenRouter)
 [openclaw] Ready. Listening for messages...
 ```
 
 ### Test the bot
-Open Telegram, search for your bot (`@YourBotUsername`), and send: `Hello`
 
-The bot should greet you and ask for your birth details.
+Open Telegram, find your bot by username, and send: `Hello`
+
+The agent will greet you and ask for your birth details to begin onboarding.
 
 ---
 
-## Environment Setup for Production (Ubuntu VM)
+## Production Deployment (Ubuntu VM)
 
-For a persistent deployment on a Linux VM, use `pm2` or `systemd`.
+### Option A — pm2 (Recommended)
 
-### Using pm2:
 ```bash
 npm install -g pm2
 
-# Create an ecosystem config
-pm2 start --name horamind \
-  --env-file .env \
-  -- sh -c 'OPENCLAW_CONFIG_PATH=./openclaw.json openclaw gateway'
+pm2 start ./start.sh --name horamind
 
 # Persist across reboots
 pm2 save
 pm2 startup
 ```
 
-### Two-terminal quick-start:
+### Option B — Two-terminal quick-start
+
 ```bash
 # Terminal 1 — ChromaDB
-cd /path/to/JyotishBase && chroma run --path ./chroma_data
+cd /path/to/JyotishBase
+chroma run --path ./chroma_data --host 0.0.0.0 --port 8000
 
 # Terminal 2 — HoraMind
-cd /path/to/HoraMind && OPENCLAW_CONFIG_PATH=./openclaw.json openclaw gateway
+cd /path/to/HoraMind
+npm start
+```
+
+### Option C — systemd service
+
+Create `/etc/systemd/system/horamind.service`:
+
+```ini
+[Unit]
+Description=HoraMind Vedic Astrology Bot
+After=network.target
+
+[Service]
+Type=simple
+User=hari
+WorkingDirectory=/home/hari/agents/astrology/HoraMind
+ExecStart=/bin/bash /home/hari/agents/astrology/HoraMind/start.sh
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
+```
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable horamind
+sudo systemctl start horamind
+```
+
+---
+
+## Debugging the Tools Standalone
+
+Each tool script can be run independently to verify it works before launching the full agent:
+
+```bash
+# Tool 1 — chart calculation (Chennai birth example)
+node tools/calculate_chart.js '{"date":"1996-12-07","time":"10:34:00","lat":13.0878,"lon":80.2785,"ayanamsa":"LAHIRI","calculation_type":"CORE_CHARTS","timezone":"Asia/Kolkata"}'
+
+# Tool 2 — RAG search
+node tools/query_bphs_rag.js "Effects of Rahu in 9th house from Lagna"
+
+# Tool 3 — rate limiter peek (read-only, does not increment)
+node tools/check_rate_limit.js 123456789 --peek
+```
+
+Or use the npm aliases:
+
+```bash
+npm run tools:test-chart
+npm run tools:test-rag
+npm run tools:test-rate
 ```
 
 ---
@@ -266,41 +346,34 @@ cd /path/to/HoraMind && OPENCLAW_CONFIG_PATH=./openclaw.json openclaw gateway
 
 - Each Telegram user gets **5 open-ended interpretive queries per day**.
 - The counter resets at **midnight Eastern Time (EST/EDT)**.
-- The onboarding pipeline (first-time setup) is **free** — it does not count toward the daily limit.
-- Users can check their remaining quota by asking: *"How many queries do I have left?"*
+- The **onboarding pipeline** (first-time chart generation) is free — it does not consume query slots.
+- Users can check their quota by asking: *"How many queries do I have left today?"*
+- Quota state is stored in `rate_limits.json` at the workspace root (auto-created, gitignored).
 
 ---
 
-## Project Structure Notes
+## Key Files Reference
 
-- **`users/`** — Gitignored. Contains each user's karmic blueprint and iteration files.
-- **`rate_limits.json`** — Gitignored. Auto-created on first use.
-- **`agent_config/`** — The agent's "brain". Edit `SOUL.md` to change behaviour or add rules.
-- **`tools/`** — The calculation and search backends. Each `.js` file can also be run standalone for debugging.
-
----
-
-## Debugging the Tools
-
-Test each tool independently before running the full agent:
-
-```bash
-# Test chart calculation (Chennai birth example)
-node tools/calculate_chart.js '{"date":"1996-12-07","time":"10:34:00","lat":13.0878,"lon":80.2785,"ayanamsa":"LAHIRI","calculation_type":"CORE_CHARTS","timezone":"Asia/Kolkata"}'
-
-# Test RAG search
-node tools/query_bphs_rag.js "Effects of Rahu in 9th house from Lagna"
-
-# Test rate limiter (peek — does not increment)
-node tools/check_rate_limit.js 123456789 --peek
-```
+| File | Purpose | Gitignored? |
+|---|---|---|
+| `openclaw.json` | Live gateway config (holds bot token) | ✅ Yes |
+| `openclaw.example.json` | Committed template for `openclaw.json` | No |
+| `.env` | API keys and service URLs | ✅ Yes |
+| `.env.example` | Committed template for `.env` | No |
+| `start.sh` | Launcher — env loading + gateway start | No |
+| `SOUL.md` | Agent persona + Conflict Resolution Matrix | No |
+| `AGENTS.md` | Onboarding pipeline + operating rules | No |
+| `IDENTITY.md` | Agent name, tone, communication style | No |
+| `TOOLS.md` | Tool registry and invocation guide | No |
+| `users/` | Per-user karmic blueprints and chart files | ✅ Yes |
+| `rate_limits.json` | Daily query counter per user | ✅ Yes |
 
 ---
 
 ## Related Projects
 
-- [**JyotishBase**](https://github.com/HariEshwar-J-A/JyotishBase) — The open-source BPHS vector database. Clone this to populate your ChromaDB.
-- [**Node-Jhora**](https://github.com/HariEshwar-J-A/node-jhora) — The TypeScript Vedic Astrology calculation engine powering Tool 1.
+- [**JyotishBase**](https://github.com/HariEshwar-J-A/JyotishBase) — The open-source BPHS vector database. Clone this to build and run the ChromaDB collection that HoraMind queries.
+- [**Node-Jhora**](https://github.com/HariEshwar-J-A/node-jhora) — The TypeScript Vedic Astrology calculation engine powering the `calculate_chart.js` tool.
 
 ---
 
