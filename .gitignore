@@ -1,8 +1,9 @@
 # Dependencies
 node_modules/
 
-#Secrets
+# Secrets
 .env
+openclaw.json
 
 # Secure Data
 /users/
