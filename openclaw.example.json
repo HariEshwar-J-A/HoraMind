@@ -16,16 +16,16 @@
         "defaults": {
             "workspace": ".",
             "model": {
-                "primary": "anthropic/claude-sonnet-4-6",
+                "primary": "openrouter/anthropic/claude-sonnet-4-6",
                 "fallbacks": [
-                    "google/gemini-2.5-flash"
+                    "openrouter/google/gemini-2.5-flash"
                 ]
             },
             "models": {
-                "anthropic/claude-sonnet-4-6": {
+                "openrouter/anthropic/claude-sonnet-4-6": {
                     "alias": "sonnet"
                 },
-                "google/gemini-2.5-flash": {
+                "openrouter/google/gemini-2.5-flash": {
                     "alias": "flash"
                 }
             },

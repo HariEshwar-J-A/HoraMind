@@ -26,7 +26,8 @@ HoraMind/                          ← OpenClaw workspace root (workspace: ".")
 ├── openclaw.example.json          ← Committed template for openclaw.json
 ├── .env                           ← API keys — gitignored, copy from .env.example
 ├── .env.example                   ← Committed template for .env
-├── start.sh                       ← Launcher: sources .env, sets CWD, starts gateway
+├── start.sh                       ← Launcher: sources .env, registers auth, starts gateway
+├── stop.sh                        ← Safe shutdown: kills gateway + wipes API key from disk
 ├── package.json                   ← Node.js dependencies + npm scripts
 │
 ├── SOUL.md                        ← Agent core identity + Conflict Resolution Matrix
@@ -235,14 +236,17 @@ chmod +x start.sh
 npm start
 ```
 
-`start.sh` does three things before handing off to OpenClaw:
+`start.sh` does the following before handing off to OpenClaw:
 1. Changes directory to the HoraMind root so all relative paths resolve correctly.
-2. Sources `.env` — makes `OPENROUTER_API_KEY` and `CHROMA_URL` available to the process.
-3. Validates that `OPENROUTER_API_KEY` is set, then starts the gateway.
+2. Sources `.env` — injects `OPENROUTER_API_KEY` and `CHROMA_URL` into the process environment.
+3. Validates that `OPENROUTER_API_KEY` is set.
+4. **Bootstraps the OpenClaw agent auth store** — writes `OPENROUTER_API_KEY` into `~/.openclaw/agents/main/agent/auth-profiles.json` on first run. This is a separate file from `openclaw.json`; OpenClaw resolves model API keys from it, not from the process environment. Subsequent runs detect the key is already registered and skip this step.
+5. Launches the gateway.
 
 You should see:
 ```
 [horamind] Loaded .env
+[horamind] Registered OpenRouter API key in agent auth store.
 [horamind] Starting OpenClaw gateway...
 [horamind] Workspace : /home/hari/agents/astrology/HoraMind
 [horamind] Config    : /home/hari/agents/astrology/HoraMind/openclaw.json
@@ -250,9 +254,15 @@ You should see:
 [openclaw] Telegram channel: connected (@HoraMindBot)
 [openclaw] Skills loaded: calculate-chart, query-bphs-rag, check-rate-limit
 [openclaw] Agent workspace: /home/hari/agents/astrology/HoraMind
-[openclaw] Default model: anthropic/claude-sonnet-4-6 (via OpenRouter)
+[openclaw] Default model: openrouter/anthropic/claude-sonnet-4-6
 [openclaw] Ready. Listening for messages...
 ```
+
+> **Why `openrouter/` prefix on model IDs?**
+> OpenClaw parses the first segment of a model ID as the provider. Without the prefix,
+> `anthropic/claude-sonnet-4-6` is treated as a direct Anthropic API call (requiring an
+> Anthropic API key). With `openrouter/anthropic/claude-sonnet-4-6`, OpenClaw routes the
+> request through OpenRouter using the registered `openrouter:default` profile.
 
 ### Test the bot
 
@@ -269,6 +279,10 @@ The agent will greet you and ask for your birth details to begin onboarding.
 ```bash
 npm install -g pm2
 
+# Run start.sh once manually first so the auth store gets bootstrapped,
+# then hand off to pm2 for process management on subsequent restarts.
+chmod +x start.sh
+./start.sh &   # let it register auth, then Ctrl+C
 pm2 start ./start.sh --name horamind
 
 # Persist across reboots
@@ -352,6 +366,38 @@ npm run tools:test-rate
 
 ---
 
+## Stopping HoraMind Safely
+
+**Always use `stop.sh` to shut down — never just `Ctrl+C` or `kill`.** The gateway writes your `OPENROUTER_API_KEY` into `~/.openclaw/agents/main/agent/auth-profiles.json` in plaintext on startup. `stop.sh` kills the process and immediately wipes that file so the key does not persist on disk between sessions.
+
+```bash
+# Full shutdown: stop gateway + wipe key
+npm run stop        # or: ./stop.sh
+
+# Key wipe only (use this after a crash where the process is already dead)
+npm run revoke      # or: ./stop.sh --revoke-only
+```
+
+The key is automatically re-injected the next time you run `npm start`.
+
+### What `stop.sh` does
+
+1. **Detects the process** — checks pm2 first, then falls back to `pgrep` on `openclaw gateway`.
+2. **Graceful shutdown** — sends `SIGTERM` and waits up to 5 seconds; escalates to `SIGKILL` only if the process ignores it.
+3. **Atomically wipes the key** — writes a placeholder `auth-profiles.json` (empty `apiKey`) via temp-file + rename so there is no window where the file is partially written.
+
+### `--revoke-only` mode
+
+If the process crashed or was killed externally, the auth store still holds the key. Run:
+
+```bash
+./stop.sh --revoke-only
+```
+
+This skips process management entirely and only clears the auth store.
+
+---
+
 ## Key Files Reference
 
 | File | Purpose | Gitignored? |
@@ -360,7 +406,8 @@ npm run tools:test-rate
 | `openclaw.example.json` | Committed template for `openclaw.json` | No |
 | `.env` | API keys and service URLs | ✅ Yes |
 | `.env.example` | Committed template for `.env` | No |
-| `start.sh` | Launcher — env loading + gateway start | No |
+| `start.sh` | Launcher — env loading, auth bootstrap, gateway start | No |
+| `stop.sh` | Safe shutdown — kills gateway + wipes API key from auth store | No |
 | `SOUL.md` | Agent persona + Conflict Resolution Matrix | No |
 | `AGENTS.md` | Onboarding pipeline + operating rules | No |
 | `IDENTITY.md` | Agent name, tone, communication style | No |
