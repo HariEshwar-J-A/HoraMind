@@ -1,3 +1,13 @@
+# Dependencies
 node_modules/
+
+#Secrets
 .env
+
+# Secure Data
 /users/
+rate_limits.json
+
+# AI
+CLAUDE.md
+.claude/

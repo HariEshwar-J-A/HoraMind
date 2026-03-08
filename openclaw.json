@@ -1,0 +1,61 @@
+{
+    "gateway": {
+        "port": 3001,
+        "bind": "127.0.0.1"
+    },
+    "agents": {
+        "defaults": {
+            "workspace": "./agent_config",
+            "model": "claude-sonnet-4.6"
+        }
+    },
+    "models": {
+        "claude-sonnet-4.6": {
+            "provider": "openrouter",
+            "model": "anthropic/claude-sonnet-4.6",
+            "apiKey": "$env.OPENROUTER_API_KEY",
+            "params": {
+                "max_tokens": 16000,
+                "temperature": 0.3
+            }
+        },
+        "gemini-2-5-flash": {
+            "provider": "openrouter",
+            "model": "google/gemini-2.5-flash",
+            "apiKey": "$env.OPENROUTER_API_KEY",
+            "params": {
+                "max_tokens": 4096,
+                "temperature": 0.7
+            }
+        }
+    },
+    "channels": {
+        "telegram": {
+            "enabled": true,
+            "botToken": "$env.TELEGRAM_BOT_TOKEN",
+            "dmPolicy": "open",
+            "groupPolicy": "disabled"
+        }
+    },
+    "skills": {
+        "load": {
+            "extraDirs": [
+                "./tools"
+            ]
+        },
+        "entries": {
+            "calculate-chart": {
+                "enabled": true
+            },
+            "query-bphs-rag": {
+                "enabled": true,
+                "env": {
+                    "CHROMA_URL": "$env.CHROMA_URL"
+                }
+            },
+            "check-rate-limit": {
+                "enabled": true
+            }
+        }
+    }
+}
