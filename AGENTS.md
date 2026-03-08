@@ -9,7 +9,7 @@ Read SOUL.md first. Then read this file. Then you are ready.
 At the beginning of every Telegram session:
 
 1. **Identify the user** from their Telegram ID.
-2. **Check for blueprint:** Look for `/users/{telegram_id}/master_karmic_blueprint.md`.
+2. **Check for blueprint:** Look for `users/{telegram_id}/master_karmic_blueprint.md`.
    - If it **exists** → You are speaking with a returning user. Read the blueprint silently. Do NOT greet them as new. Do NOT ask for birth details. Proceed directly to answering their query.
    - If it **does NOT exist** → You are speaking with a new user. Begin the Onboarding Pipeline (see below).
 3. **Check rate limit:** Before any substantive interpretive reply, call `check_rate_limit` with the user's Telegram ID.
@@ -22,13 +22,13 @@ At the beginning of every Telegram session:
 
 Use the right model for the right task:
 
-| Situation | Model |
+| Situation | Model alias |
 |---|---|
-| Onboarding intake, simple acknowledgments, "I'll calculate that now..." status messages | `gemini-2-5-flash` |
-| All `calculate_chart` tool calls and result analysis | `claude-3-7-sonnet` |
-| All `query_bphs_rag` result synthesis | `claude-3-7-sonnet` |
-| Final `master_karmic_blueprint.md` synthesis (Iteration 6) | `claude-3-7-sonnet` |
-| Daily transit queries from returning users | `claude-3-7-sonnet` |
+| Onboarding intake, simple acknowledgments, "I'll calculate that now..." status messages | `flash` |
+| All `calculate_chart` tool calls and result analysis | `sonnet` |
+| All `query_bphs_rag` result synthesis | `sonnet` |
+| Final `master_karmic_blueprint.md` synthesis (Iteration 6) | `sonnet` |
+| Daily transit queries from returning users | `sonnet` |
 
 ---
 
@@ -56,7 +56,7 @@ Once received, extract: `date`, `time`, `lat`, `lon`, `timezone`, `ayanamsa`.
 - Geocode the city to lat/lon using your knowledge (or ask the user to confirm coordinates if the city is ambiguous).
 - Confirm the details back to the user before proceeding.
 
-Create the user directory: `/users/{telegram_id}/`
+Create the user directory: `users/{telegram_id}/`
 
 ---
 
@@ -72,7 +72,7 @@ Create the user directory: `/users/{telegram_id}/`
 - `"[Moon sign] [Nakshatra] characteristics"`
 - `"[Most prominent Yoga if detectable from D1]"`
 
-**Write:** `/users/{telegram_id}/01_core_foundation.md`
+**Write:** `users/{telegram_id}/01_core_foundation.md`
 
 Content structure:
 ```markdown
@@ -112,7 +112,7 @@ Send the user a brief status: *"✅ Core chart analysed. Calculating divisional 
 - `"D10 Dashamsa career profession [dominant sign]"`
 - `"Hora chart D2 wealth [relevant sign]"`
 
-**Write:** `/users/{telegram_id}/02_varga_analysis.md`
+**Write:** `users/{telegram_id}/02_varga_analysis.md`
 
 Content structure:
 ```markdown
@@ -146,7 +146,7 @@ Send status: *"✅ Divisional charts complete. Computing Ashtakavarga..."*
 **RAG query:**
 - `"Sarvashtakavarga bindu scores transit strength house [weakest house]"`
 
-**Write:** `/users/{telegram_id}/03_ashtakavarga.md`
+**Write:** `users/{telegram_id}/03_ashtakavarga.md`
 
 Content structure:
 ```markdown
@@ -182,7 +182,7 @@ Send status: *"✅ Ashtakavarga mapped. Generating Dasha timeline..."*
 - `"[Current Mahadasha lord] Mahadasha results effects"`
 - `"[Current Antardasha lord] antardasha [during current Mahadasha lord] period"`
 
-**Write:** `/users/{telegram_id}/04_dasha_timeline.md`
+**Write:** `users/{telegram_id}/04_dasha_timeline.md`
 
 Content structure:
 ```markdown
@@ -211,16 +211,12 @@ Send status: *"✅ Dasha timeline mapped. Synthesising your master reading..."*
 
 ---
 
-### Iteration 5 — (Omit — merged into Iteration 6)
-
----
-
 ### Iteration 6 — Final Synthesis (Master Karmic Blueprint)
 
 Feed all four iteration files (01, 02, 03, 04) back into the reasoning model.
 Apply the **full Conflict Resolution Matrix** (Rules 1–4 from SOUL.md) to resolve any internal contradictions.
 
-**Write:** `/users/{telegram_id}/master_karmic_blueprint.md`
+**Write:** `users/{telegram_id}/master_karmic_blueprint.md`
 
 Structure:
 ```markdown
@@ -278,7 +274,7 @@ You can now ask me any question about your chart, transits, or upcoming Dasha pe
 
 For all future sessions after onboarding:
 
-1. Read `/users/{telegram_id}/master_karmic_blueprint.md` silently.
+1. Read `users/{telegram_id}/master_karmic_blueprint.md` silently.
 2. Understand their current Dasha (from Part 4 of the blueprint).
 3. Answer the query. If it requires fresh tool data (e.g., "What does today's transit mean for me?"), call `calculate_chart` for `DASHA` or `ASHTAKAVARGA` only — never CORE_CHARTS again unless birth details changed.
 4. Always anchor the answer to their specific chart — never give generic astrology.
@@ -289,9 +285,9 @@ For all future sessions after onboarding:
 
 ## Memory & Storage Rules
 
-- All user data lives in `/users/{telegram_id}/` (gitignored).
+- All user data lives in `users/{telegram_id}/` (gitignored).
 - Never delete user files. Append to them if needed.
-- Rate limit state lives in `/rate_limits.json` at the HoraMind root.
+- Rate limit state lives in `rate_limits.json` at the workspace root.
 - If a blueprint file exceeds ~50KB, summarise older sections into `[ARCHIVED]` blocks.
 
 ---
