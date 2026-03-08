@@ -1,0 +1,22 @@
+{
+    "name": "horamind",
+    "version": "1.0.0",
+    "description": "OpenClaw-powered Telegram AI Agent for astrology leveraging the node-jhora math engine and LLM routing logic.",
+    "main": "index.js",
+    "scripts": {
+        "start": "node index.js",
+        "test": "echo \"Error: no test specified\" && exit 1"
+    },
+    "keywords": [
+        "telegram",
+        "bot",
+        "ai-agent",
+        "openclaw",
+        "node-jhora",
+        "astrology",
+        "rag"
+    ],
+    "author": "HariEshwar-J-A",
+    "license": "PolyForm-Noncommercial-1.0.0",
+    "dependencies": {}
+}
