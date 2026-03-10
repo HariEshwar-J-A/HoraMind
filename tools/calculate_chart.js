@@ -150,8 +150,13 @@ function estimateSunriseSunset(lat) {
  * CORE_CHARTS: D1 positions + D9 (Navamsa) + Shadbala for 7 planets.
  */
 async function calcCoreCharts(engine, birthDt, location, ayanamsaOrder) {
+    // ayanamsaOrder is already applied globally in calculateChart() — do NOT pass
+    // it here, as getPlanets() would call setAyanamsa() again and overwrite the
+    // SIDM_USER calibration we set for JHora-compatible Lahiri ayanamsa.
+    // Geocentric positions — JHora and classical Jyotish use geocentric for all
+    // chart positions. Topocentric Moon correction (~0.93°) is NOT applied here.
     const planets = engine.getPlanets(birthDt.toUTC(), location, {
-        ayanamsaOrder, topocentric: true, nodeType: 'mean',
+        topocentric: false, nodeType: 'mean',
     });
     const houses  = calculateHouseCusps(birthDt.toUTC(), location.latitude, location.longitude,
         'WholeSign', engine);
@@ -220,7 +225,7 @@ async function calcCoreCharts(engine, birthDt, location, ayanamsaOrder) {
  */
 async function calcVargas(engine, birthDt, location, ayanamsaOrder) {
     const planets = engine.getPlanets(birthDt.toUTC(), location, {
-        ayanamsaOrder, topocentric: true, nodeType: 'mean',
+        topocentric: false, nodeType: 'mean',
     });
 
     const result = { calculation_type: 'VARGAS' };
@@ -241,7 +246,7 @@ async function calcVargas(engine, birthDt, location, ayanamsaOrder) {
  */
 async function calcAshtakavarga(engine, birthDt, location, ayanamsaOrder) {
     const planets = engine.getPlanets(birthDt.toUTC(), location, {
-        ayanamsaOrder, topocentric: true, nodeType: 'mean',
+        topocentric: false, nodeType: 'mean',
     });
     const houses = calculateHouseCusps(birthDt.toUTC(), location.latitude, location.longitude,
         'WholeSign', engine);
@@ -286,11 +291,19 @@ async function calcAshtakavarga(engine, birthDt, location, ayanamsaOrder) {
  * Returns periods spanning 10 years before now → 20 years from now.
  */
 async function calcDasha(engine, birthDt, location, ayanamsaOrder) {
+    // Dasha balance is computed from the Moon's nakshatra using the GEOCENTRIC
+    // longitude (topocentric: false). The topocentric parallax correction can
+    // shift the Moon by up to ~0.95° from the geocentric position, which
+    // translates directly to a ~10-month error in the remaining Dasha balance.
+    // PyJHora and all classical Jyotish software use geocentric Moon for Dasha.
     const planets = engine.getPlanets(birthDt.toUTC(), location, {
-        ayanamsaOrder, topocentric: true, nodeType: 'mean',
+        topocentric: false, nodeType: 'mean',
     });
     const moon = planets.find(p => p.id === 1);
     if (!moon) throw new Error('Moon position unavailable — cannot compute Dasha.');
+
+    // Moon longitude is already JHora-calibrated because calculateChart() applied
+    // SE_SIDM_USER (255) before dispatch — no per-call offset needed here.
 
     // Generate full 120-year tree at depth 2 (Mahadasha + Antardasha)
     const tree   = generateVimshottari(birthDt, moon.longitude, 2);
@@ -321,9 +334,9 @@ async function calcDasha(engine, birthDt, location, ayanamsaOrder) {
         }));
 
     return {
-        calculation_type: 'DASHA',
-        moon_longitude:   +moon.longitude.toFixed(6),
-        window:           { from: cutOff.past.toISODate(), to: cutOff.future.toISODate() },
+        calculation_type:     'DASHA',
+        moon_longitude:       +moon.longitude.toFixed(6),
+        window:               { from: cutOff.past.toISODate(), to: cutOff.future.toISODate() },
         periods,
     };
 }
@@ -368,7 +381,9 @@ export async function calculateChart(input) {
 
     const location = { latitude: lat, longitude: lon };
 
-    // --- Initialize WASM engine ---
+    // --- Initialize DE440 engine ---
+    // No SE-specific calibration needed. Ayanamsa is computed entirely from
+    // the public-domain IAU precession formula, calibrated to JHora's reference.
     const engine = EphemerisEngine.getInstance();
     await engine.initialize();
     engine.setAyanamsa(ayanamsaOrder);
