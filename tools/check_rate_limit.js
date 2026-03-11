@@ -24,13 +24,24 @@ import { fileURLToPath } from 'url';
 // ---------------------------------------------------------------------------
 // Configuration
 // ---------------------------------------------------------------------------
-const DAILY_LIMIT = 5;
 const TIMEZONE    = 'America/New_York'; // EST/EDT
 
-// Rate limits file lives at the HoraMind repo root (gitignored via .gitignore)
 const __filename   = fileURLToPath(import.meta.url);
 const __dirname    = path.dirname(__filename);
 const LIMITS_FILE  = path.resolve(__dirname, '../rate_limits.json');
+const SETTINGS_FILE = path.resolve(__dirname, '../settings.json');
+
+function loadSettings() {
+    try { return JSON.parse(fs.readFileSync(SETTINGS_FILE, 'utf8')); }
+    catch { return {}; }
+}
+function getDailyLimit() {
+    return loadSettings()?.defaults?.rate_limit_per_day ?? 5;
+}
+function isAdmin(telegram_id) {
+    const ids = loadSettings()?.admin?.telegram_user_ids ?? [];
+    return ids.includes(String(telegram_id));
+}
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -51,23 +62,35 @@ function todayEST() {
 
 /**
  * Return the ISO timestamp for midnight EST tomorrow (i.e. when the quota resets).
- * Shown to users as a human-readable reset time.
+ * Computed via UTC offset to avoid unreliable timezone string parsing in Date().
  */
 function nextMidnightEST() {
-    const fmt = new Intl.DateTimeFormat('en-US', {
+    // EST = UTC-5, EDT = UTC-4. Use Intl to find the current offset.
+    const now = new Date();
+    // Get the local-time string in the target timezone, then compute the UTC equivalent.
+    const formatter = new Intl.DateTimeFormat('en-CA', {
         timeZone: TIMEZONE,
         year: 'numeric', month: '2-digit', day: '2-digit',
         hour: '2-digit', minute: '2-digit', second: '2-digit',
         hour12: false,
     });
-
-    const now   = new Date();
-    const parts = Object.fromEntries(fmt.formatToParts(now).map(p => [p.type, p.value]));
-    // Construct midnight of *tomorrow* in EST
-    const midnightStr = `${parts.year}-${parts.month}-${parts.day}T00:00:00`;
-    const midnight    = new Date(`${midnightStr} EST`);
-    midnight.setDate(midnight.getDate() + 1);
-    return midnight.toISOString();
+    // en-CA date part gives YYYY-MM-DD; parse it to find "today" in EST
+    const parts = Object.fromEntries(
+        formatter.formatToParts(now)
+            .filter(p => p.type !== 'literal')
+            .map(p => [p.type, p.value])
+    );
+    // Build tomorrow-midnight in EST as UTC by computing the offset
+    const estDateStr = `${parts.year}-${parts.month}-${parts.day}`;
+    // midnight tomorrow in EST = midnight-today-EST + 1 day
+    // Find the UTC ms that corresponds to midnight today in EST:
+    const estMidnightToday = new Date(`${estDateStr}T00:00:00`);
+    // Offset between local parse and actual: adjust by difference
+    const utcOffsetMs = now.getTime() - new Date(
+        now.toLocaleString('en-US', { timeZone: TIMEZONE })
+    ).getTime();
+    const estMidnightTomorrow = new Date(estMidnightToday.getTime() - utcOffsetMs + 86400000);
+    return estMidnightTomorrow.toISOString();
 }
 
 /**
@@ -115,9 +138,15 @@ export function checkRateLimit(telegram_id) {
         throw new Error('telegram_id must be a non-empty string or number');
     }
 
-    const userId  = String(telegram_id).trim();
-    const today   = todayEST();
-    const resetAt = nextMidnightEST();
+    const userId     = String(telegram_id).trim();
+    const today      = todayEST();
+    const resetAt    = nextMidnightEST();
+    const DAILY_LIMIT = getDailyLimit();
+
+    // Admins bypass the rate limit entirely
+    if (isAdmin(userId)) {
+        return { allowed: true, used: 0, remaining: -1, limit: -1, reset_at: resetAt, admin: true };
+    }
 
     // Load current state
     const limits = readLimits();
@@ -160,9 +189,14 @@ export function peekRateLimit(telegram_id) {
         throw new Error('telegram_id must be a non-empty string or number');
     }
 
-    const userId  = String(telegram_id).trim();
-    const today   = todayEST();
-    const resetAt = nextMidnightEST();
+    const userId      = String(telegram_id).trim();
+    const today       = todayEST();
+    const resetAt     = nextMidnightEST();
+    const DAILY_LIMIT = getDailyLimit();
+
+    if (isAdmin(userId)) {
+        return { used: 0, remaining: -1, limit: -1, reset_at: resetAt, admin: true };
+    }
 
     const limits = readLimits();
     const user   = limits[userId] ?? { date: null, count: 0 };

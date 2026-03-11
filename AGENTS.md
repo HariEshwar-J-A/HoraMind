@@ -42,17 +42,22 @@ Before any substantive interpretive reply, call `check-rate-limit` with `"telegr
 
 ---
 
-## Model Routing
+## Model Routing (Master-Slave Cost Architecture)
 
-Use the right model for the right task:
+`flash` is the **default master**. Use it for everything. `sonnet` is an expensive slave — invoke it only for the final blueprint.
 
-| Situation | Model alias |
+| Situation | Model |
 |---|---|
-| Onboarding intake, simple acknowledgments, "I'll calculate that now..." status messages | `flash` |
-| All `calculate_chart` tool calls and result analysis | `sonnet` |
-| All `query_bphs_rag` result synthesis | `sonnet` |
-| Final `master_karmic_blueprint.md` synthesis (Iteration 6) | `sonnet` |
-| Daily transit queries from returning users | `sonnet` |
+| Session start, identity check, routing | `flash` |
+| Onboarding intake, birth data collection | `flash` |
+| Tool result parsing (calculate_chart, user-manager, check-rate-limit) | `flash` |
+| Individual iteration synthesis — files 01, 02, 03, 04 | `flash` |
+| RAG chunk interpretation | `flash` |
+| Daily transit / Dasha queries | `flash` |
+| Ambiguous edge cases needing stronger reasoning | `pro` |
+| **Final master_karmic_blueprint.md synthesis (Iteration 6) ONLY** | `sonnet` |
+
+If in doubt, use `flash`. The goal: `sonnet` fires at most ONCE per user lifetime (blueprint synthesis), never again unless the user explicitly requests a full chart regeneration.
 
 ---
 

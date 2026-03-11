@@ -1,9 +1,11 @@
 {
     "admin": {
-        "telegram_user_ids": [
-            "REPLACE_WITH_YOUR_TELEGRAM_ID"
-        ],
-        "description": "Telegram user IDs with admin privileges. Admins can run calculations for any user and bypass the 5-query/day rate limit."
+        "telegram_user_ids": ["REPLACE_WITH_YOUR_TELEGRAM_ID"],
+        "description": "Admins bypass rate limits and can run calculations for any user."
+    },
+    "allowed_users": {
+        "telegram_user_ids": ["REPLACE_WITH_YOUR_TELEGRAM_ID"],
+        "description": "Whitelist of Telegram user IDs allowed to use HoraMind. Add numeric IDs here, then run: node scripts/sync_users.js"
     },
     "defaults": {
         "ayanamsa": "LAHIRI",

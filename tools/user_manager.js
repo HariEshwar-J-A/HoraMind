@@ -94,17 +94,23 @@ function sessionStart(requesting_id) {
     const onboarded    = fs.existsSync(blueprintPath(tid));
     const hasProfile   = fs.existsSync(profilePath(tid));
     const admin        = isAdmin(tid);
+    const settings     = loadSettings();
+    const dailyLimit   = settings?.defaults?.rate_limit_per_day ?? 5;
 
     return {
-        action:       'session_start',
-        telegram_id:  tid,
-        is_admin:     admin,
-        is_onboarded: onboarded,
-        has_profile:  hasProfile,
+        action:        'session_start',
+        telegram_id:   tid,
+        is_admin:      admin,
+        is_onboarded:  onboarded,
+        has_profile:   hasProfile,
         blueprint_path: onboarded ? `users/${tid}/master_karmic_blueprint.md` : null,
+        rate_limit:    admin ? null : dailyLimit,   // null = unlimited for admins
         message: onboarded
             ? `Returning user ${tid}. Blueprint ready at users/${tid}/master_karmic_blueprint.md.`
             : `New user ${tid}. No blueprint found — begin onboarding.`,
+        note: admin
+            ? 'ADMIN SESSION: rate limit bypassed, cross-user access enabled.'
+            : undefined,
     };
 }
 
