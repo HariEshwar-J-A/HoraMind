@@ -1,7 +1,36 @@
 # TOOLS.md — HoraMind Tool Registry
 
-This file documents the three custom tools available to the HoraMind agent.
+This file documents all custom tools available to the HoraMind agent.
 Read this file when deciding which tool to invoke and in what sequence.
+
+---
+
+## Tool 0: `user-manager` (user_manager.js) ← CALL FIRST EVERY SESSION
+
+**Purpose:** Session identity lock and per-user data isolation enforcement.
+This is the security gate. Call it FIRST before any other tool or file read.
+
+**Invoke as:**
+```bash
+node ./tools/user_manager.js '<json_input>'
+```
+
+**MANDATORY session start:**
+```json
+{ "action": "session_start", "requesting_id": "{{sender.id}}" }
+```
+
+**All actions:**
+
+| Action | Purpose |
+|--------|---------|
+| `session_start` | Identify user, return onboarding status — MANDATORY FIRST CALL |
+| `save_birth` | Store birth details for a user |
+| `get_profile` | Retrieve stored birth data |
+| `is_onboarded` | Check if master_karmic_blueprint.md exists |
+| `list_users` | Admin only: list all users |
+
+**Access rule:** `requesting_id` MUST equal `{{sender.id}}`. Tool rejects cross-user access unless requesting user is admin.
 
 ---
 
@@ -128,8 +157,10 @@ node ./tools/check_rate_limit.js <telegram_id> --peek
 
 ### New User Onboarding (Sequential):
 ```
+0. user_manager → session_start  ← ALWAYS FIRST
 1. [No rate limit check — onboarding is free]
-2. calculate_chart → CORE_CHARTS
+2. user_manager → save_birth (after user provides birth details)
+3. calculate_chart → CORE_CHARTS
 3. query_bphs_rag × 3 (for lagna, moon sign, dominant yoga)
 4. → Write 01_core_foundation.md
 5. calculate_chart → VARGAS
@@ -147,6 +178,7 @@ node ./tools/check_rate_limit.js <telegram_id> --peek
 
 ### Returning User Daily Query:
 ```
+0. user_manager → session_start  ← ALWAYS FIRST
 1. Read master_karmic_blueprint.md silently
 2. check_rate_limit → {telegram_id} [increment mode]
    → If denied: reply with reset time, stop.

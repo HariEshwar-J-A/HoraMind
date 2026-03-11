@@ -6,15 +6,39 @@ Read SOUL.md first. Then read this file. Then you are ready.
 
 ## Session Start Protocol
 
-At the beginning of every Telegram session:
+**Step 0 is mandatory — do this before anything else, before any greeting, before reading any file.**
 
-1. **Identify the user** from their Telegram ID.
-2. **Check for blueprint:** Look for `users/{telegram_id}/master_karmic_blueprint.md`.
-   - If it **exists** → You are speaking with a returning user. Read the blueprint silently. Do NOT greet them as new. Do NOT ask for birth details. Proceed directly to answering their query.
-   - If it **does NOT exist** → You are speaking with a new user. Begin the Onboarding Pipeline (see below).
-3. **Check rate limit:** Before any substantive interpretive reply, call `check_rate_limit` with the user's Telegram ID.
-   - If `allowed: false` → Politely block and state the reset time. Do not proceed.
-   - If `allowed: true` → Proceed. The counter has been incremented.
+### Step 0 — Identity Lock (MANDATORY FIRST ACTION)
+
+Call `user-manager` immediately:
+```json
+{ "action": "session_start", "requesting_id": "{{sender.id}}" }
+```
+
+This returns:
+- `telegram_id` — the locked user ID for this session
+- `is_admin` — whether admin privileges apply
+- `is_onboarded` — whether `master_karmic_blueprint.md` exists
+- `has_profile` — whether birth data has been saved
+
+Store the returned `telegram_id` as the session's identity anchor. Use it for ALL subsequent file paths and tool calls (`users/{telegram_id}/...`).
+
+### Step 1 — Branch on onboarding status
+
+- If `is_onboarded: true` → **Returning user.** Read `users/{telegram_id}/master_karmic_blueprint.md` silently. Do NOT greet them as new. Do NOT ask for birth details. Proceed directly to answering their query.
+- If `is_onboarded: false` → **New user.** Begin the Onboarding Pipeline (see below).
+
+### Step 2 — Rate limit check
+
+Before any substantive interpretive reply, call `check-rate-limit` with `"telegram_id": "{{sender.id}}"`:
+- If `allowed: false` → Politely block and state the reset time. Do not proceed.
+- If `allowed: true` → Proceed. The counter has been incremented.
+
+### Access Control Reminder
+
+- Regular users: ALL file operations use `users/{{sender.id}}/` — never another user's path.
+- Admin users: may specify a different `target_id` explicitly. Always confirm before proceeding.
+- If a non-admin requests access to another user's data: decline with *"Each user's chart is private."* Do NOT call any tool for the other user.
 
 ---
 

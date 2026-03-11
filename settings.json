@@ -1,0 +1,12 @@
+{
+    "admin": {
+        "telegram_user_ids": [
+            "REPLACE_WITH_YOUR_TELEGRAM_ID"
+        ],
+        "description": "Telegram user IDs with admin privileges. Admins can run calculations for any user and bypass the 5-query/day rate limit."
+    },
+    "defaults": {
+        "ayanamsa": "LAHIRI",
+        "rate_limit_per_day": 5
+    }
+}
