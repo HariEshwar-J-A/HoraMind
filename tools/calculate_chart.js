@@ -29,9 +29,19 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname  = path.dirname(__filename);
 const JHORA      = path.resolve(__dirname, '../../node-jhora/packages');
 
-const coreURL       = pathToFileURL(path.join(JHORA, 'core/dist/index.js')).href;
-const analyticsURL  = pathToFileURL(path.join(JHORA, 'analytics/dist/index.js')).href;
-const predictionURL = pathToFileURL(path.join(JHORA, 'prediction/dist/index.js')).href;
+import { existsSync } from 'fs';
+
+// Prefer the sibling checkout so local engine changes are picked up without a
+// republish; fall back to the installed packages when it is absent (the normal
+// case on a deployment host).
+const useLocal = existsSync(path.join(JHORA, 'core/dist/index.js'));
+const pkg = (name, file) => useLocal
+    ? pathToFileURL(path.join(JHORA, file)).href
+    : name;
+
+const coreURL       = pkg('@node-jhora/core',       'core/dist/index.js');
+const analyticsURL  = pkg('@node-jhora/analytics',  'analytics/dist/index.js');
+const predictionURL = pkg('@node-jhora/prediction', 'prediction/dist/index.js');
 
 // Dynamic imports so we can use top-level await in ESM
 const { EphemerisEngine, calculateVarga, calculateHouseCusps, AYANAMSA }
@@ -40,7 +50,7 @@ const { EphemerisEngine, calculateVarga, calculateHouseCusps, AYANAMSA }
 const { calculateShadbala, Ashtakavarga }
     = await import(analyticsURL);
 
-const { generateVimshottari }
+const { generateVimshottari, TransitEngine }
     = await import(predictionURL);
 
 // Luxon is a dep of @node-jhora/core — import directly from it
@@ -52,12 +62,19 @@ const { DateTime } = await import('luxon');
 
 /** Maps user-facing ayanamsa strings → SE code */
 const AYANAMSA_MAP = {
+    // Star-defined models carry no fitted constant -- they are derived from a
+    // computed star position, so they are exact at every date. Prefer them.
+    TRUE_CHITRA:  AYANAMSA.TRUE_CITRA,    // 27 -- default; what JHora uses
+    TRUE_PUSHYA:  AYANAMSA.TRUE_PUSHYA,   // 29
+    TRUE_REVATI:  AYANAMSA.TRUE_REVATI,   // 30
+    TRUE_MULA:    AYANAMSA.TRUE_MULA,     // 35
     LAHIRI:       AYANAMSA.LAHIRI,        // 1
+    LAHIRI_ICRC:  AYANAMSA.LAHIRI_ICRC,   // 2
     RAMAN:        AYANAMSA.RAMAN,         // 3
     KP:           AYANAMSA.KRISHNAMURTI,  // 5
     KRISHNAMURTI: AYANAMSA.KRISHNAMURTI,  // 5
     YUKTESHWAR:   AYANAMSA.YUKTESHWAR,    // 7
-    TRUE_PUSHYA:  AYANAMSA.TRUE_PUSHYA,   // 29
+    FAGAN_BRADLEY: AYANAMSA.FAGAN_BRADLEY, // 0
 };
 
 /** Planet IDs: 0=Sun 1=Moon 2=Mercury 3=Venus 4=Mars 5=Jupiter 6=Saturn 7=Rahu 8=Ketu */
@@ -65,6 +82,10 @@ const PLANET_NAMES = ['Sun','Moon','Mercury','Venus','Mars','Jupiter','Saturn','
 
 /** Rashi sign lords (sign index 0-based → planet ID) */
 const SIGN_LORD = [4,3,2,1,0,2,3,4,5,6,6,5]; // Aries…Pisces
+
+/** Rasi names, index 0 = Aries. Used by the TRANSITS report. */
+const SIGNS = ['Aries', 'Taurus', 'Gemini', 'Cancer', 'Leo', 'Virgo',
+               'Libra', 'Scorpio', 'Sagittarius', 'Capricorn', 'Aquarius', 'Pisces'];
 
 /** Divisional numbers for VARGAS mode (D2–D30 selection) */
 const VARGA_DIVISIONS = [2, 4, 10, 12, 16, 20, 24, 27, 30];
@@ -97,7 +118,7 @@ function buildDateTime(date, time, lon, timezone) {
 function formatPlanets(planets) {
     return Object.fromEntries(
         planets.map(p => [
-            PLANET_NAMES[p.id] ?? `P${p.id}`,
+            p.name ?? PLANET_NAMES[p.id] ?? `P${p.id}`,
             {
                 lon:   +p.longitude.toFixed(4),
                 sign:  Math.floor(p.longitude / 30) + 1,   // 1-12
@@ -166,7 +187,7 @@ async function calcCoreCharts(engine, birthDt, location, ayanamsaOrder) {
     // D9 (Navamsa) positions
     const d9 = Object.fromEntries(
         planets.map(p => [
-            PLANET_NAMES[p.id] ?? `P${p.id}`,
+            p.name ?? PLANET_NAMES[p.id] ?? `P${p.id}`,
             formatVarga(calculateVarga(p.longitude, 9)),
         ])
     );
@@ -233,7 +254,7 @@ async function calcVargas(engine, birthDt, location, ayanamsaOrder) {
         const key = `D${div}`;
         result[key] = Object.fromEntries(
             planets.map(p => [
-                PLANET_NAMES[p.id] ?? `P${p.id}`,
+                p.name ?? PLANET_NAMES[p.id] ?? `P${p.id}`,
                 formatVarga(calculateVarga(p.longitude, div)),
             ])
         );
@@ -290,7 +311,7 @@ async function calcAshtakavarga(engine, birthDt, location, ayanamsaOrder) {
  * DASHA: Vimshottari Dasha timeline (Mahadasha + Antardasha).
  * Returns periods spanning 10 years before now → 20 years from now.
  */
-async function calcDasha(engine, birthDt, location, ayanamsaOrder) {
+async function calcDasha(engine, birthDt, location, ayanamsaOrder, dashaDepth, asOfISO) {
     // Dasha balance is computed from the Moon's nakshatra using the GEOCENTRIC
     // longitude (topocentric: false). The topocentric parallax correction can
     // shift the Moon by up to ~0.95° from the geocentric position, which
@@ -302,11 +323,11 @@ async function calcDasha(engine, birthDt, location, ayanamsaOrder) {
     const moon = planets.find(p => p.id === 1);
     if (!moon) throw new Error('Moon position unavailable — cannot compute Dasha.');
 
-    // Moon longitude is already JHora-calibrated because calculateChart() applied
-    // SE_SIDM_USER (255) before dispatch — no per-call offset needed here.
-
-    // Generate full 120-year tree at depth 2 (Mahadasha + Antardasha)
-    const tree   = generateVimshottari(birthDt, moon.longitude, 2);
+    // Depth 3 reaches Pratyantardasha, which interpretive queries need; the
+    // previous hardcoded 2 stopped at Antardasha. See agent_config/
+    // prediction-method.md section 2.
+    const depth  = Math.min(5, Math.max(1, dashaDepth ?? 3));
+    const tree   = generateVimshottari(birthDt, moon.longitude, depth);
     const now    = DateTime.now();
     const cutOff = { past: now.minus({ years: 10 }), future: now.plus({ years: 20 }) };
 
@@ -330,6 +351,17 @@ async function calcDasha(engine, birthDt, location, ayanamsaOrder) {
                     start:    a.start.toISODate(),
                     end:      a.end.toISODate(),
                     duration: +a.durationYears.toFixed(4),
+                    // Level 3. The tree is generated to `depth`, but this
+                    // serializer used to stop at Antardasha and silently drop
+                    // it, so PD was unreachable however deep the tree went.
+                    pratyantardashas: (a.subPeriods ?? [])
+                        .filter(p3 => p3.end > cutOff.past && p3.start < cutOff.future)
+                        .map(p3 => ({
+                            planet:   p3.planet,
+                            start:    p3.start.toISODate(),
+                            end:      p3.end.toISODate(),
+                            duration: +p3.durationYears.toFixed(5),
+                        })),
                 })),
         }));
 
@@ -356,14 +388,103 @@ async function calcDasha(engine, birthDt, location, ayanamsaOrder) {
  * @param {string} [input.timezone]       — IANA zone string (optional)
  * @returns {Promise<object>}
  */
+
+// ---------------------------------------------------------------------------
+// TRANSITS — gochara at the moment of asking
+//
+// Answering "what should I expect?" needs the sky *now*, not only the birth
+// chart. Everything is measured from the natal Moon (the classical gochara
+// reference) and from the natal ascendant, and weighted by Ashtakavarga so a
+// transit can be judged rather than merely listed.
+//
+// See agent_config/prediction-method.md section 3.
+// ---------------------------------------------------------------------------
+async function calcTransits(engine, birthDt, location, ayanamsaOrder, asOfISO, horizonDays) {
+    const natal = engine.getPlanets(birthDt.toUTC(), location, {
+        topocentric: false, nodeType: 'true', ayanamsaOrder,
+    });
+    const natalHouses = calculateHouseCusps(birthDt, location.latitude, location.longitude,
+                                            'WholeSign', engine, ayanamsaOrder);
+    const ascSign  = Math.floor(natalHouses.ascendant / 30) + 1;
+    const moonSign = Math.floor(natal.find(p => p.id === 1).longitude / 30) + 1;
+
+    const { sav } = Ashtakavarga.calculateSAV(natal);
+
+    const asOf = asOfISO ? DateTime.fromISO(asOfISO) : DateTime.now();
+    const transiting = engine.getPlanets(asOf.toUTC(), location, {
+        topocentric: false, nodeType: 'true', ayanamsaOrder,
+    });
+
+    const houseFrom = (from, to) => ((((to - from) % 12) + 12) % 12) + 1;
+
+    const planets = transiting.map(p => {
+        const sign = Math.floor(p.longitude / 30) + 1;
+        const natalSign = Math.floor(natal.find(n => n.id === p.id).longitude / 30) + 1;
+        return {
+            name: p.name,
+            sign, signName: SIGNS[sign - 1],
+            degree: +(p.longitude % 30).toFixed(4),
+            retrograde: p.speed < 0,
+            houseFromMoon: houseFrom(moonSign, sign),
+            houseFromLagna: houseFrom(ascSign, sign),
+            // 28+ bindus tends to deliver; 25 or fewer tends to disappoint,
+            // regardless of the transit's own nature.
+            savBindus: sav[sign - 1],
+            isReturn: sign === natalSign,
+        };
+    });
+
+    const satFromMoon = planets.find(p => p.name === 'Saturn').houseFromMoon;
+
+    // The engine must use the SAME ayanamsa as the chart, or ingress times land
+    // in the wrong zodiac -- roughly five hours of Saturn's motion.
+    const te  = new TransitEngine(engine, { ayanamsaOrder, nodeType: 'true' });
+    const end = asOf.plus({ days: horizonDays ?? 365 });
+
+    const upcoming = [];
+    for (const [id, name] of [[5, 'Jupiter'], [6, 'Saturn']]) {
+        for (const e of await te.findTransits(id, asOf, end, 24)) {
+            if (e.type !== 'Sign') continue;
+            upcoming.push({
+                planet: name,
+                from: SIGNS[e.prevValue], to: SIGNS[e.newValue],
+                at: e.time.toISO(),
+                houseFromMoon:  houseFrom(moonSign, e.newValue + 1),
+                houseFromLagna: houseFrom(ascSign,  e.newValue + 1),
+            });
+        }
+    }
+    upcoming.sort((a, b) => String(a.at).localeCompare(String(b.at)));
+
+    return {
+        calculation_type: 'TRANSITS',
+        asOf: asOf.toISO(),
+        natal: {
+            ascendantSign: ascSign, ascendantSignName: SIGNS[ascSign - 1],
+            moonSign, moonSignName: SIGNS[moonSign - 1],
+        },
+        planets,
+        sadeSati: {
+            active: [12, 1, 2].includes(satFromMoon),
+            phase: satFromMoon === 12 ? 'rising'
+                 : satFromMoon === 1  ? 'peak'
+                 : satFromMoon === 2  ? 'setting' : null,
+            houseFromMoon: satFromMoon,
+            kantakaShani: [4, 7, 10].includes(satFromMoon),
+            ashtamaShani: satFromMoon === 8,
+        },
+        upcoming,
+    };
+}
+
 export async function calculateChart(input) {
-    const { date, time, lat, lon, ayanamsa = 'LAHIRI', calculation_type, timezone } = input;
+    const { date, time, lat, lon, ayanamsa = 'TRUE_CHITRA', calculation_type, timezone } = input;
 
     // --- Validate ---
     if (!date || !time || lat == null || lon == null) {
         throw new Error('Missing required fields: date, time, lat, lon');
     }
-    const VALID_TYPES = ['CORE_CHARTS', 'VARGAS', 'ASHTAKAVARGA', 'DASHA'];
+    const VALID_TYPES = ['CORE_CHARTS', 'VARGAS', 'ASHTAKAVARGA', 'DASHA', 'TRANSITS'];
     if (!VALID_TYPES.includes(calculation_type)) {
         throw new Error(`Invalid calculation_type "${calculation_type}". Must be one of: ${VALID_TYPES.join(', ')}`);
     }
@@ -393,7 +514,10 @@ export async function calculateChart(input) {
         case 'CORE_CHARTS':   return calcCoreCharts(engine, birthDt, location, ayanamsaOrder);
         case 'VARGAS':        return calcVargas(engine, birthDt, location, ayanamsaOrder);
         case 'ASHTAKAVARGA':  return calcAshtakavarga(engine, birthDt, location, ayanamsaOrder);
-        case 'DASHA':         return calcDasha(engine, birthDt, location, ayanamsaOrder);
+        case 'DASHA':         return calcDasha(engine, birthDt, location, ayanamsaOrder,
+                                                input.depth, input.asOf);
+        case 'TRANSITS':      return calcTransits(engine, birthDt, location, ayanamsaOrder,
+                                                   input.asOf, input.horizonDays);
     }
 }
 

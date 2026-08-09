@@ -30,7 +30,9 @@ env.backends.onnx.wasm.numThreads = 1;
 // ---------------------------------------------------------------------------
 // Configuration
 // ---------------------------------------------------------------------------
-const CHROMA_URL = 'http://192.168.128.128:8000';
+// Configurable rather than pinned to one VM's address. The previous hardcoded
+// IP meant the tool only worked from a single machine.
+const CHROMA_URL = process.env.CHROMA_URL || 'http://127.0.0.1:8000';
 const COLLECTION_NAME = 'santhanam_source_of_truth';
 const TOP_K = 4;
 const EMBEDDING_MODEL = 'Xenova/all-MiniLM-L6-v2'; // 384-dim, matches ingest script
@@ -130,24 +132,47 @@ export async function queryBphsRag(query) {
         const collection = await getCollection();
         raw = await collection.query({
             queryEmbeddings: [embedding],
-            nResults: TOP_K,
+            // Over-fetch so the substance re-rank below has something to work
+            // with; the caller still receives TOP_K.
+            nResults: Math.max(TOP_K * 5, 20),
             include: ['documents', 'metadatas', 'distances'],
         });
     } catch (err) {
         if (err.message?.includes('ECONNREFUSED')) {
             throw new Error(
                 `ChromaDB is not reachable at ${CHROMA_URL}. ` +
-                'Start it with: chroma run --path ./chroma_data'
+                `Start it with: python serve_chroma.py (in JyotishBase), or set CHROMA_URL.`
             );
         }
         throw new Error(`ChromaDB query failed: ${err.message}`);
     }
 
-    // 3. Format results
-    const ids = raw.ids?.[0] ?? [];
-    const docs = raw.documents?.[0] ?? [];
-    const metas = raw.metadatas?.[0] ?? [];
-    const distances = raw.distances?.[0] ?? [];
+    // 3. Re-rank for substance, then format.
+    //
+    // Bare chapter headings ("Effects of the Antardasas in the Dasa of Saturn")
+    // are short and match query terms densely, so they outrank the verses that
+    // actually state the rule. They give an interpreter nothing to reason from.
+    // A mild length prior fixes the ordering without discarding them -- a
+    // heading is still a legitimate hit when nothing better exists.
+    const SUBSTANCE_FLOOR = 260;   // chars below which a chunk is mostly a title
+    const MAX_PENALTY     = 0.18;  // in cosine-distance units
+
+    const rows = (raw.ids?.[0] ?? []).map((id, i) => {
+        const document = raw.documents?.[0]?.[i] ?? '';
+        const distance = raw.distances?.[0]?.[i] ?? 1;
+        const shortfall = Math.max(0, SUBSTANCE_FLOOR - document.length) / SUBSTANCE_FLOOR;
+        return {
+            id, document,
+            metadata: raw.metadatas?.[0]?.[i] ?? {},
+            distance,
+            adjusted: distance + shortfall * MAX_PENALTY,
+        };
+    }).sort((a, b) => a.adjusted - b.adjusted).slice(0, TOP_K);
+
+    const ids = rows.map(r => r.id);
+    const docs = rows.map(r => r.document);
+    const metas = rows.map(r => r.metadata);
+    const distances = rows.map(r => r.distance);
 
     if (ids.length === 0) {
         return [];
