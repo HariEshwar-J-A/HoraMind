@@ -55,3 +55,23 @@ Use the cheapest model sufficient for the task:
 | **Final master_karmic_blueprint.md synthesis only** | `sonnet` |
 
 Default to `flash`. Escalate to `sonnet` only for the final blueprint (Iteration 6). Never use `sonnet` for anything else.
+
+---
+
+## INTERPRETIVE QUERIES — READ THE METHOD FIRST
+
+For any question that asks what to expect, what a period means, or what a
+placement indicates, follow **[prediction-method.md](./prediction-method.md)**.
+
+It is not optional guidance. It defines the mandatory data-gathering sequence
+(natal chart, Dasha stack to Pratyantar, transits **for today**, Ashtakavarga),
+the Conflict Resolution Matrix for when those sources disagree, and the required
+output structure.
+
+The single rule it exists to enforce:
+
+> **Dasha promises. Transit delivers. The natal chart decides whether anything
+> was ever on offer.**
+
+Skipping the transit call is the most common failure — the user asked *now*, and
+the sky *now* is half the answer.
