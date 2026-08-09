@@ -37,8 +37,9 @@ node ./tools/user_manager.js '<json_input>'
 ## Tool 1: `calculate_chart` (calculate_chart.js)
 
 **Purpose:** The astrological math engine. Interfaces with the node-jhora library
-to perform Swiss Ephemeris calculations. Acts as a switchboard — call it once per
-calculation type, never for all types in a single call.
+(JPL DE440 ephemeris — **not** Swiss Ephemeris; there is no WASM and no AGPL in
+the dependency graph). Acts as a switchboard — call it once per calculation type,
+never for all types in a single call.
 
 **Invoke as:**
 ```bash
@@ -65,9 +66,23 @@ node ./tools/calculate_chart.js '<json_input>'
 | `CORE_CHARTS` | D1 planets, D9 Navamsa, Shadbala (all 7 components per planet) | Onboarding Iteration 1 only |
 | `VARGAS` | D2, D4, D10, D12, D16, D20, D24, D27, D30 | Onboarding Iteration 2 only |
 | `ASHTAKAVARGA` | SAV bindu scores per house + per-planet BAV | Onboarding Iteration 3 + transit queries |
-| `DASHA` | Vimshottari Mahadasha + Antardasha tree (±10/20 yr window) | Onboarding Iteration 4 + timeline queries |
+| `DASHA` | Vimshottari tree. Pass `depth` 1-5: 1=MD, 2=+AD, **3=+PD**, 4=+SD, 5=+PrD | Onboarding Iteration 4 + timeline queries |
+| `TRANSITS` | Positions **now** (or at `asOf`), each with house from natal Moon and lagna, Ashtakavarga bindus of the transited sign, retrograde flag, Sade Sati / Kantaka / Ashtama Shani status, and upcoming slow-mover ingresses | Any "what should I expect" query — see prediction-method.md §3 |
 
-**`ayanamsa` valid values:** `LAHIRI`, `RAMAN`, `KP`, `KRISHNAMURTI`, `YUKTESHWAR`, `TRUE_PUSHYA`
+**`ayanamsa` valid values:** `TRUE_CHITRA` (**default** — Spica at 180°, Drik
+Siddhanta, and what JHora uses), `TRUE_PUSHYA`, `TRUE_REVATI`, `TRUE_MULA`,
+`LAHIRI`, `LAHIRI_ICRC`, `RAMAN`, `KP`, `YUKTESHWAR`, `FAGAN_BRADLEY`.
+
+**Use the same ayanamsa for every call in a session.** A natal chart in one zero
+point and a transit chart in another silently corrupts every house relationship
+between them — the two differ by around 0.02°, which is hours of Saturn's motion.
+
+**`DASHA` depth:** the default is 2 (MD + AD). Interpretive queries need at least
+`depth: 3` to reach Pratyantardasha; use 4 when the window is under a year.
+
+**`TRANSITS` extras:** `asOf` (ISO 8601, defaults to now — this is the moment the
+sky is read for, while the birth fields still describe the native) and
+`horizonDays` (how far ahead to look for ingresses, default 365).
 
 **Output:** Compact JSON object. Structure varies by `calculation_type`.
 
