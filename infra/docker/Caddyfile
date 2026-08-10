@@ -1,0 +1,27 @@
+# Caddy edge configuration.
+#
+# Replace `api.example.com` with the real hostname and Caddy will obtain and
+# renew a Let's Encrypt certificate on its own. For a local run without a public
+# DNS name, use `:80` instead of the hostname.
+
+{$API_DOMAIN:localhost} {
+	encode zstd gzip
+
+	# The API is the only upstream; there is no static content to serve.
+	reverse_proxy api:8080 {
+		health_uri /health
+		health_interval 30s
+	}
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "no-referrer"
+		-Server
+	}
+
+	log {
+		output stdout
+		format json
+	}
+}

@@ -1,0 +1,80 @@
+# syntax=docker/dockerfile:1.7
+#
+# API image.
+#
+# Multi-stage so the runtime layer carries no compiler, no dev dependencies and
+# no source. The build stage needs them; the thing that faces the internet
+# should not.
+#
+# Build from the repository root:
+#   docker build -f infra/docker/Dockerfile.api -t horamind/api .
+
+# ---------------------------------------------------------------------------
+# Stage 1 — install dependencies (cached independently of source changes)
+# ---------------------------------------------------------------------------
+FROM node:22-alpine AS deps
+
+WORKDIR /app
+
+# Only manifests, so this layer is reused on every build that does not change
+# dependencies — which is most of them.
+COPY package.json package-lock.json* ./
+COPY apps/api/package.json           apps/api/
+COPY packages/shared/package.json    packages/shared/
+
+# `npm ci` needs a lockfile; fall back to `install` on a first build that has
+# not generated one yet, so the image is buildable from a clean checkout.
+RUN --mount=type=cache,target=/root/.npm \
+    if [ -f package-lock.json ]; then npm ci; else npm install; fi
+
+# ---------------------------------------------------------------------------
+# Stage 2 — compile TypeScript
+# ---------------------------------------------------------------------------
+FROM node:22-alpine AS build
+
+WORKDIR /app
+COPY --from=deps /app/node_modules ./node_modules
+COPY . .
+
+RUN npm run build --workspace @horamind/shared \
+ && npm run build --workspace @horamind/api
+
+# Drop dev dependencies now that compilation is done.
+RUN npm prune --omit=dev
+
+# ---------------------------------------------------------------------------
+# Stage 3 — runtime
+# ---------------------------------------------------------------------------
+FROM node:22-alpine AS runtime
+
+# dumb-init reaps zombies and forwards SIGTERM, which Node as PID 1 does not do
+# properly — without it, graceful shutdown never runs and deploys drop requests.
+RUN apk add --no-cache dumb-init
+
+ENV NODE_ENV=production \
+    PORT=8080 \
+    HOST=0.0.0.0
+
+WORKDIR /app
+
+# The `node` user ships with the image; running as root in a container that
+# terminates untrusted input is an unnecessary risk.
+COPY --from=build --chown=node:node /app/node_modules      ./node_modules
+COPY --from=build --chown=node:node /app/package.json      ./package.json
+COPY --from=build --chown=node:node /app/apps/api/dist     ./apps/api/dist
+COPY --from=build --chown=node:node /app/apps/api/package.json ./apps/api/
+COPY --from=build --chown=node:node /app/packages/shared/dist ./packages/shared/dist
+COPY --from=build --chown=node:node /app/packages/shared/package.json ./packages/shared/
+COPY --from=build --chown=node:node /app/db                ./db
+
+USER node
+
+EXPOSE 8080
+
+# Hits the liveness route, which by design does not touch the database — an
+# unreachable database should not make Docker kill a healthy process.
+HEALTHCHECK --interval=30s --timeout=3s --start-period=40s --retries=3 \
+    CMD node -e "fetch('http://127.0.0.1:8080/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+
+ENTRYPOINT ["dumb-init", "--"]
+CMD ["node", "apps/api/dist/index.js"]

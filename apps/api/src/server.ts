@@ -1,0 +1,110 @@
+import Fastify, { type FastifyInstance } from 'fastify';
+import cors from '@fastify/cors';
+import helmet from '@fastify/helmet';
+import rateLimit from '@fastify/rate-limit';
+import swagger from '@fastify/swagger';
+import swaggerUi from '@fastify/swagger-ui';
+import { serializerCompiler, validatorCompiler, jsonSchemaTransform } from 'fastify-type-provider-zod';
+import { randomUUID } from 'node:crypto';
+
+import { loadEnv, corsOrigins, type Env } from './config/env.js';
+import { initDb } from './db/client.js';
+import { registerErrorHandler } from './plugins/error-handler.js';
+import { healthRoutes } from './routes/health.js';
+
+/**
+ * Fastify application factory.
+ *
+ * Kept separate from the process entry point so tests can build a server,
+ * inject requests into it, and close it without binding a port.
+ */
+export async function buildServer(env: Env = loadEnv()): Promise<FastifyInstance> {
+    const app = Fastify({
+        // A request id on every log line and every error response is what makes
+        // "it failed at 3pm" a searchable question rather than a guess.
+        genReqId: req => (req.headers['x-request-id'] as string) ?? randomUUID(),
+        requestIdHeader: 'x-request-id',
+        logger: {
+            level: env.LOG_LEVEL,
+            transport: env.NODE_ENV === 'development' ? { target: 'pino-pretty' } : undefined,
+            redact: {
+                // These appear in request bodies and headers and must never
+                // reach the log store, which has a different retention policy
+                // and a wider audience than the database.
+                paths: [
+                    'req.headers.authorization',
+                    'req.headers.cookie',
+                    'req.body.password',
+                    'req.body.newPassword',
+                    'req.body.idToken',
+                    'req.body.refreshToken',
+                ],
+                censor: '[redacted]',
+            },
+        },
+        // Without this, every client IP behind Caddy or an ingress reads as the
+        // proxy — which silently merges all users into one rate-limit bucket.
+        trustProxy: env.TRUST_PROXY,
+        bodyLimit: 1_048_576,
+    });
+
+    app.setValidatorCompiler(validatorCompiler);
+    app.setSerializerCompiler(serializerCompiler);
+
+    await app.register(helmet, {
+        // The API serves JSON, not documents; CSP matters for the Swagger UI only.
+        contentSecurityPolicy: env.NODE_ENV === 'production' ? undefined : false,
+    });
+
+    await app.register(cors, {
+        origin: corsOrigins(env),
+        credentials: true,
+        methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
+    });
+
+    /**
+     * Coarse network-level rate limit. This is abuse protection, not the
+     * product quota — per-user tier limits are enforced against
+     * `usage_counters` inside the routes that consume them, because those must
+     * be atomic and survive a restart.
+     */
+    await app.register(rateLimit, {
+        max: 300,
+        timeWindow: '1 minute',
+        keyGenerator: req => (req.user?.id ?? req.ip),
+    });
+
+    await app.register(swagger, {
+        openapi: {
+            info: {
+                title: 'HoraMind API',
+                description: 'Vedic astrology computation, retrieval and interpretation.',
+                version: '2.0.0',
+            },
+            servers: [{ url: env.PUBLIC_BASE_URL }],
+            components: {
+                securitySchemes: {
+                    bearerAuth: { type: 'http', scheme: 'bearer', bearerFormat: 'JWT' },
+                },
+            },
+        },
+        transform: jsonSchemaTransform,
+    });
+
+    if (env.NODE_ENV !== 'production') {
+        await app.register(swaggerUi, { routePrefix: '/docs' });
+    }
+
+    registerErrorHandler(app);
+
+    await app.register(healthRoutes);
+
+    return app;
+}
+
+/** Initialise shared resources that routes assume are already up. */
+export async function initResources(env: Env = loadEnv()): Promise<void> {
+    initDb(env);
+    const { initEngine } = await import('./lib/engine.js');
+    await initEngine();
+}
