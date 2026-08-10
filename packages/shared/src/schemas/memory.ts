@@ -46,3 +46,37 @@ export const InterestSchema = CreateInterestSchema.extend({
 });
 
 export type Interest = z.infer<typeof InterestSchema>;
+
+/**
+ * The weekly interest prompt.
+ *
+ * Interests are asked for, never inferred from what the user types in chat.
+ * That is a deliberate trade: a direct answer is what the user actually meant
+ * rather than what a model guessed from their questions, and nothing has to
+ * read conversations, so the privacy claim needs no asterisk.
+ *
+ * The cycle is anchored to each user's onboarding date rather than a shared
+ * weekday, which also spreads the load instead of concentrating it on Mondays.
+ */
+export const InterestPromptStateSchema = z.object({
+    /** Whether the client should show the overlay now. */
+    due: z.boolean(),
+    dueAt: z.string().nullable(),
+    optedOut: z.boolean(),
+    /** Current interests, so the overlay can prefill rather than start empty. */
+    current: z.array(InterestSchema),
+    remainingSlots: z.number().int().nonnegative(),
+});
+
+export const InterestPromptResponseSchema = z.object({
+    /**
+     * `answer` replaces the interest set; `skip` defers a week; `never` opts
+     * out permanently. Kept as one endpoint so the client cannot leave the
+     * prompt in a state where it is neither answered nor rescheduled and
+     * therefore fires again on the next launch.
+     */
+    action: z.enum(['answer', 'skip', 'never']),
+    interests: z.array(CreateInterestSchema).max(30).optional(),
+});
+
+export type InterestPromptState = z.infer<typeof InterestPromptStateSchema>;

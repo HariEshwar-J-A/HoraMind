@@ -14,6 +14,9 @@ import { authPlugin } from './plugins/auth.js';
 import { healthRoutes } from './routes/health.js';
 import { authRoutes } from './routes/auth.js';
 import { sessionRoutes } from './routes/sessions.js';
+import { profileRoutes } from './routes/profiles.js';
+import { memoryRoutes } from './routes/memories.js';
+import { chartRoutes } from './routes/charts.js';
 
 /**
  * Fastify application factory.
@@ -105,6 +108,9 @@ export async function buildServer(env: Env = loadEnv()): Promise<FastifyInstance
     await app.register(healthRoutes);
     await app.register(authRoutes,    { prefix: '/v1' });
     await app.register(sessionRoutes, { prefix: '/v1' });
+    await app.register(profileRoutes, { prefix: '/v1' });
+    await app.register(memoryRoutes,  { prefix: '/v1' });
+    await app.register(chartRoutes,   { prefix: '/v1' });
 
     return app;
 }
