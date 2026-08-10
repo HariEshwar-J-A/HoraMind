@@ -10,7 +10,10 @@ import { randomUUID } from 'node:crypto';
 import { loadEnv, corsOrigins, type Env } from './config/env.js';
 import { initDb } from './db/client.js';
 import { registerErrorHandler } from './plugins/error-handler.js';
+import { authPlugin } from './plugins/auth.js';
 import { healthRoutes } from './routes/health.js';
+import { authRoutes } from './routes/auth.js';
+import { sessionRoutes } from './routes/sessions.js';
 
 /**
  * Fastify application factory.
@@ -97,7 +100,11 @@ export async function buildServer(env: Env = loadEnv()): Promise<FastifyInstance
 
     registerErrorHandler(app);
 
+    await app.register(authPlugin);
+
     await app.register(healthRoutes);
+    await app.register(authRoutes,    { prefix: '/v1' });
+    await app.register(sessionRoutes, { prefix: '/v1' });
 
     return app;
 }

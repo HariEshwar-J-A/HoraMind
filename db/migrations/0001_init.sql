@@ -108,6 +108,14 @@ CREATE TABLE sessions (
     -- SHA-256 of the refresh token. The token itself is never stored, so a
     -- database leak does not hand over live sessions.
     refresh_token_hash bytea       NOT NULL UNIQUE,
+    -- The hash this one replaced, kept for exactly one rotation.
+    --
+    -- Refresh tokens rotate on every use, so a previous token should never be
+    -- presented again. If one is, the most likely explanation is that it was
+    -- stolen and the thief is racing the legitimate client. Recognising the old
+    -- value is what lets us detect that and revoke the session, rather than
+    -- silently treating it as an unknown token.
+    previous_token_hash bytea,
     -- Shown in the device list, so it has to be recognisable to a human.
     device_label       text,
     platform           text,
@@ -123,6 +131,8 @@ CREATE TABLE sessions (
 
 CREATE INDEX sessions_user_active_idx ON sessions (user_id, last_seen_at DESC)
     WHERE revoked_at IS NULL;
+CREATE INDEX sessions_previous_token_idx ON sessions (previous_token_hash)
+    WHERE previous_token_hash IS NOT NULL;
 
 -- Short-lived, single-use tokens for email verification and password reset.
 CREATE TABLE auth_tokens (
