@@ -1,0 +1,66 @@
+/*
+ * Global resets only.
+ *
+ * Component styling lives in token objects, not here — that is what keeps a
+ * React Native port mechanical. This file exists for the handful of things that
+ * have no component to attach to: the document background, font stack, and the
+ * browser behaviours that make a web page feel unlike an app.
+ */
+
+:root {
+    color-scheme: dark;
+    --bg: #0B0D17;
+}
+
+* {
+    box-sizing: border-box;
+}
+
+html,
+body {
+    margin: 0;
+    padding: 0;
+    background-color: var(--bg);
+    /* System stack: no webfont to download, and it already matches whatever
+       platform the app is installed on. */
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+        "Helvetica Neue", Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+}
+
+/* Rubber-band scrolling past the end of a standalone PWA reveals the page
+   behind it and breaks the illusion of a native app. */
+body {
+    overscroll-behavior-y: none;
+}
+
+/* The grey flash on tap is a web affordance; installed apps do not have it. */
+* {
+    -webkit-tap-highlight-color: transparent;
+}
+
+/* Long-press text selection on buttons and labels feels broken in an app.
+   Inputs and prose keep it, because there selecting text is the point. */
+button,
+nav,
+summary {
+    user-select: none;
+}
+
+input,
+textarea {
+    font-family: inherit;
+}
+
+details > summary::-webkit-details-marker {
+    display: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        transition-duration: 0.01ms !important;
+    }
+}

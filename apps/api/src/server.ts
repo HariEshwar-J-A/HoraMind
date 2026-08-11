@@ -1,5 +1,6 @@
 import Fastify, { type FastifyInstance } from 'fastify';
 import cors from '@fastify/cors';
+import cookie from '@fastify/cookie';
 import helmet from '@fastify/helmet';
 import rateLimit from '@fastify/rate-limit';
 import swagger from '@fastify/swagger';
@@ -66,6 +67,9 @@ export async function buildServer(env: Env = loadEnv()): Promise<FastifyInstance
         // The API serves JSON, not documents; CSP matters for the Swagger UI only.
         contentSecurityPolicy: env.NODE_ENV === 'production' ? undefined : false,
     });
+
+    // Needed to read the httpOnly refresh cookie a browser client relies on.
+    await app.register(cookie);
 
     await app.register(cors, {
         origin: corsOrigins(env),

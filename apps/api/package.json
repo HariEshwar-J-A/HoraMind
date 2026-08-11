@@ -12,6 +12,7 @@
         "test": "vitest run"
     },
     "dependencies": {
+        "@fastify/cookie": "^11.1.2",
         "@fastify/cors": "^10.0.2",
         "@fastify/helmet": "^13.0.1",
         "@fastify/rate-limit": "^10.2.2",
