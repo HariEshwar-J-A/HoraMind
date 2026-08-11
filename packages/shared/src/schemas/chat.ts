@@ -44,7 +44,10 @@ export const ChatMessageSchema = z.object({
     grounding: z.object({
         dashaStack:  z.array(z.string()).optional(),
         citations:   z.array(z.object({
-            source:  z.string(),
+            // Nullable throughout: the corpus does not tag every chunk with a
+            // source, chapter and verse, and a citation missing one of them is
+            // still worth showing.
+            source:  z.string().nullable(),
             chapter: z.number().nullable(),
             verse:   z.string().nullable(),
         })).optional(),
