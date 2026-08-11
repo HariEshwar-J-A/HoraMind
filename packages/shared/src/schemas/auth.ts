@@ -66,8 +66,16 @@ export const OAuthLoginSchema = z.object({
     device:   DeviceInfoSchema.default({ label: 'Unknown device', platform: 'unknown' }),
 });
 
+/**
+ * Refresh.
+ *
+ * `refreshToken` is optional because a browser client cannot read the httpOnly
+ * cookie that carries it — the browser attaches it automatically and the server
+ * reads it there. Native clients, which have secure storage but no cookie jar,
+ * send it in the body. The server requires one or the other.
+ */
 export const RefreshSchema = z.object({
-    refreshToken: z.string().min(16),
+    refreshToken: z.string().min(16).optional(),
 });
 
 export const TokenPairSchema = z.object({

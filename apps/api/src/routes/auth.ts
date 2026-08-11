@@ -14,7 +14,8 @@ import * as auth from '../services/auth.js';
 import * as users from '../repos/users.js';
 import { hashPassword, hashToken, generateOpaqueToken } from '../lib/crypto.js';
 import { revokeAllSessions } from '../repos/sessions.js';
-import { badRequest, notFound } from '../lib/errors.js';
+import { badRequest, notFound, unauthorized } from '../lib/errors.js';
+import { setRefreshCookie, clearRefreshCookie, readRefreshToken } from '../lib/cookies.js';
 
 /**
  * Authentication routes.
@@ -48,6 +49,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
             { email: b.email, password: b.password, displayName: b.displayName, timezone: b.timezone },
             b.device, req.ip,
         );
+        setRefreshCookie(reply, env, result.tokens.refreshToken);
         return reply.status(201).send(result);
     });
 
@@ -61,6 +63,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
     }, async (req, reply) => {
         const b = req.body;
         const result = await auth.login(getDb(), env, { email: b.email, password: b.password }, b.device, req.ip);
+        setRefreshCookie(reply, env, result.tokens.refreshToken);
         return reply.status(200).send(result);
     });
 
@@ -78,6 +81,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
             { provider: b.provider, idToken: b.idToken, fullName: b.fullName },
             b.device, req.ip,
         );
+        setRefreshCookie(reply, env, result.tokens.refreshToken);
         return reply.status(200).send(result);
     });
 
@@ -89,7 +93,16 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
             response: { 200: TokenPairSchema },
         },
     }, async (req, reply) => {
-        const tokens = await auth.refresh(getDb(), env, req.body.refreshToken);
+        // Body for native clients, cookie for browsers. One or the other must
+        // be present; neither means there is nothing to refresh from.
+        const presented = readRefreshToken(req, req.body.refreshToken);
+        if (!presented) throw unauthorized('No refresh token supplied');
+
+        const tokens = await auth.refresh(getDb(), env, presented);
+        // Rotation issued a new token, so the cookie has to move with it or the
+        // next refresh would present the one just rotated away — which the
+        // server correctly treats as reuse and punishes by revoking the session.
+        setRefreshCookie(reply, env, tokens.refreshToken);
         return reply.status(200).send(tokens);
     });
 
@@ -103,6 +116,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
         },
     }, async (req, reply) => {
         await auth.logout(getDb(), req.user!.id, req.user!.sessionId);
+        clearRefreshCookie(reply, env);
         return reply.status(204).send(null);
     });
 

@@ -70,6 +70,11 @@ jobs:
           node db/migrate.mjs | tee second-run.txt
           grep -q "up to date" second-run.txt
 
+      # The PWA is a separate build target; a type error in a screen should
+      # fail CI rather than surface at deploy time.
+      - name: Build web client
+        run: npm run build --workspace @horamind/web
+
       - name: Test
         env:
           DATABASE_URL: postgres://horamind:ci@localhost:5432/horamind_test
