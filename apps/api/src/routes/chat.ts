@@ -198,10 +198,13 @@ export async function chatRoutes(app: FastifyInstance): Promise<void> {
                 question: req.body.content,
             });
 
-            await chats.addMessage(
-                sql, chat.id, 'user', req.body.content, estimateTokens(req.body.content),
-            );
-
+            // The user turn is deliberately NOT written yet.
+            //
+            // Persisting it before the model call leaves an orphaned question
+            // behind whenever that call fails. The next attempt then loads it
+            // as history *and* appends the same text as the new question, so
+            // the model sees it twice and answers as though it had been asked
+            // twice. Both turns are written together once there is a reply.
             const result = await interpret({
                 env, sql, userId, tier, messages,
                 onLlmCall: async call => {
@@ -214,6 +217,10 @@ export async function chatRoutes(app: FastifyInstance): Promise<void> {
                                 ${call.latencyMs}, ${call.ok})`;
                 },
             });
+
+            await chats.addMessage(
+                sql, chat.id, 'user', req.body.content, estimateTokens(req.body.content),
+            );
 
             // The grounding travels with the message so a past reply can still
             // show its sources after the chart or the dasha has moved on.

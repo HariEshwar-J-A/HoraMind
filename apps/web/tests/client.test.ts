@@ -173,3 +173,41 @@ describe('route table', () => {
         expect(new Set(ROUTES.map(r => r.path)).size).toBe(ROUTES.length);
     });
 });
+
+describe('session recovery', () => {
+    afterEach(() => { vi.unstubAllGlobals(); });
+
+    test('a failed refresh drops the session to anonymous', async () => {
+        // The bug this guards: with no sign-out handler wired, a refresh that
+        // fails mid-session leaves the store reporting "authenticated". The
+        // route guard keeps rendering screens, every request fails, and there
+        // is no path back to sign-in — the app simply stops working.
+        const { useSession } = await import('../src/lib/session.js');
+
+        useSession.setState({
+            user: { publicId: 'A1B2C3D4' } as never,
+            status: 'authenticated',
+        });
+
+        vi.stubGlobal('fetch', vi.fn(async () => new Response('{}', { status: 401 })));
+
+        await useSession.getState().restore();
+
+        expect(useSession.getState().status).toBe('anonymous');
+        expect(useSession.getState().user).toBeNull();
+        expect(useSession.getState().profile).toBeNull();
+    });
+
+    test('signing out clears local state even when the server call fails', async () => {
+        // A user who taps sign out and stays signed in has been ignored.
+        const { useSession } = await import('../src/lib/session.js');
+
+        useSession.setState({ user: { publicId: 'A1B2C3D4' } as never, status: 'authenticated' });
+        vi.stubGlobal('fetch', vi.fn(async () => { throw new Error('network down'); }));
+
+        await useSession.getState().signOut();
+
+        expect(useSession.getState().status).toBe('anonymous');
+        expect(useSession.getState().user).toBeNull();
+    });
+});

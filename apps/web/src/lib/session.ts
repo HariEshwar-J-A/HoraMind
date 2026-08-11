@@ -104,4 +104,15 @@ export const useSession = create<SessionState>((set, get) => ({
     },
 }));
 
+/*
+ * A failed refresh means the session is gone — revoked from another device, or
+ * simply expired. Without this the store keeps reporting `authenticated`, the
+ * route guard keeps letting screens render, and every request fails with no
+ * path back to sign-in. Registered here rather than injected at construction
+ * because the client cannot import this module without a cycle.
+ */
+api.setSignedOutHandler(() => {
+    useSession.setState({ user: null, profile: null, status: 'anonymous' });
+});
+
 export { currentTimezone };
