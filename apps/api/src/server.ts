@@ -19,6 +19,9 @@ import { memoryRoutes } from './routes/memories.js';
 import { chartRoutes } from './routes/charts.js';
 import { ragRoutes } from './routes/rag.js';
 import { interpretRoutes } from './routes/interpret.js';
+import { chatRoutes } from './routes/chat.js';
+import { compassRoutes } from './routes/compass.js';
+import { retentionPlugin } from './plugins/retention.js';
 
 /**
  * Fastify application factory.
@@ -107,6 +110,10 @@ export async function buildServer(env: Env = loadEnv()): Promise<FastifyInstance
 
     await app.register(authPlugin);
 
+    // Scheduled hard-deletes. Registered only outside tests, so a suite never
+    // starts a timer that outlives the assertions it was built for.
+    if (env.NODE_ENV !== 'test') await app.register(retentionPlugin);
+
     await app.register(healthRoutes);
     await app.register(authRoutes,    { prefix: '/v1' });
     await app.register(sessionRoutes, { prefix: '/v1' });
@@ -115,6 +122,8 @@ export async function buildServer(env: Env = loadEnv()): Promise<FastifyInstance
     await app.register(chartRoutes,   { prefix: '/v1' });
     await app.register(ragRoutes,     { prefix: '/v1' });
     await app.register(interpretRoutes, { prefix: '/v1' });
+    await app.register(chatRoutes,    { prefix: '/v1' });
+    await app.register(compassRoutes, { prefix: '/v1' });
 
     return app;
 }
