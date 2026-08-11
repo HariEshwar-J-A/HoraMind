@@ -41,16 +41,31 @@ export interface RetentionOutcome {
 export async function runRetention(app: FastifyInstance): Promise<RetentionOutcome[] | null> {
     const sql = getDb();
 
-    const [lock] = await sql<{ acquired: boolean }[]>`
-        SELECT pg_try_advisory_lock(${RETENTION_LOCK_KEY}) AS acquired`;
+    /*
+     * Transaction-scoped lock, inside one transaction — not the session-scoped
+     * pair `pg_try_advisory_lock` / `pg_advisory_unlock`.
+     *
+     * Advisory locks belong to a *session*, and `postgres.js` is a connection
+     * pool. Taking the lock on one pooled connection and releasing it on
+     * another is entirely possible: the unlock quietly returns false, the lock
+     * stays held on the original connection, and because pooled connections
+     * persist it is never released. Retention then skips every subsequent run
+     * forever, silently, while appearing to be scheduled correctly.
+     *
+     * `pg_try_advisory_xact_lock` is released when the transaction ends —
+     * including on error or rollback — and `sql.begin` guarantees both
+     * statements share a connection.
+     */
+    return sql.begin(async tx => {
+        const [lock] = await tx<{ acquired: boolean }[]>`
+            SELECT pg_try_advisory_xact_lock(${RETENTION_LOCK_KEY}) AS acquired`;
 
-    if (!lock?.acquired) {
-        app.log.debug('retention: another instance holds the lock, skipping');
-        return null;
-    }
+        if (!lock?.acquired) {
+            app.log.debug('retention: another instance holds the lock, skipping');
+            return null;
+        }
 
-    try {
-        const rows = await sql<RetentionOutcome[]>`SELECT * FROM run_retention()`;
+        const rows = await tx<RetentionOutcome[]>`SELECT * FROM run_retention()`;
 
         const total = rows.reduce((sum, r) => sum + Number(r.rowsRemoved ?? 0), 0);
         // Logged at info only when something happened. An hourly "removed 0
@@ -62,9 +77,7 @@ export async function runRetention(app: FastifyInstance): Promise<RetentionOutco
         }
 
         return rows;
-    } finally {
-        await sql`SELECT pg_advisory_unlock(${RETENTION_LOCK_KEY})`;
-    }
+    }) as Promise<RetentionOutcome[] | null>;
 }
 
 export const retentionPlugin = fp(async (app: FastifyInstance) => {

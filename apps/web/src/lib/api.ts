@@ -48,7 +48,19 @@ export interface ApiClientOptions {
 export class ApiClient {
     private readonly baseUrl: string;
     private readonly store: TokenStore;
-    private readonly onSignedOut?: () => void;
+    private onSignedOut?: () => void;
+
+    /**
+     * Register the handler after construction.
+     *
+     * The session store imports this client, so the client cannot import the
+     * store back without a cycle. Registering the callback breaks it — and
+     * without one, a refresh that fails mid-session leaves the app believing it
+     * is signed in while every request fails, with no route back to sign-in.
+     */
+    setSignedOutHandler(handler: () => void): void {
+        this.onSignedOut = handler;
+    }
 
     /**
      * A single in-flight refresh, shared.
