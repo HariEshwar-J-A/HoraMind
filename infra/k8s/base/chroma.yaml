@@ -1,0 +1,66 @@
+# ChromaDB, serving the JyotishBase corpus.
+#
+# A StatefulSet for the same reason as Postgres: one writer, one volume, stable
+# identity across reschedules.
+apiVersion: v1
+kind: Service
+metadata:
+  name: chroma
+  namespace: horamind
+  labels: { app: chroma }
+spec:
+  clusterIP: None
+  selector: { app: chroma }
+  ports:
+    - port: 8000
+      targetPort: 8000
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: chroma
+  namespace: horamind
+spec:
+  serviceName: chroma
+  replicas: 1
+  selector:
+    matchLabels: { app: chroma }
+  template:
+    metadata:
+      labels: { app: chroma }
+    spec:
+      containers:
+        - name: chroma
+          image: chromadb/chroma:0.5.23
+          ports:
+            - containerPort: 8000
+          env:
+            - name: IS_PERSISTENT
+              value: "TRUE"
+            - name: ANONYMIZED_TELEMETRY
+              value: "FALSE"
+          volumeMounts:
+            - name: corpus
+              mountPath: /chroma/chroma
+          readinessProbe:
+            httpGet: { path: /api/v1/heartbeat, port: 8000 }
+            initialDelaySeconds: 20
+            periodSeconds: 15
+          livenessProbe:
+            httpGet: { path: /api/v1/heartbeat, port: 8000 }
+            initialDelaySeconds: 60
+            periodSeconds: 30
+            failureThreshold: 5
+          resources:
+            requests: { memory: 512Mi, cpu: 100m }
+            limits:   { memory: 1Gi }
+  volumeClaimTemplates:
+    - metadata:
+        name: corpus
+      spec:
+        accessModes: [ReadWriteOnce]
+        resources:
+          requests:
+            # The 5,338-unit corpus is well under this; the headroom is for a
+            # second book without a resize.
+            storage: 5Gi

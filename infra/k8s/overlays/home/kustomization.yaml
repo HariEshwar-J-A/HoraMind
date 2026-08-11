@@ -1,0 +1,64 @@
+# Home box overlay.
+#
+# One node, no autoscaling, smaller volumes. The base is written for a cluster
+# that might grow; this trims it to what a single desktop can actually hold, so
+# the same manifests serve both without a fork.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: horamind
+
+resources:
+  - ../../base
+
+patches:
+  # A single node cannot satisfy a PodDisruptionBudget of minAvailable: 1 with
+  # one replica — draining for a reboot would block forever waiting for a
+  # replacement that has nowhere to go.
+  - target:
+      kind: PodDisruptionBudget
+      name: api
+    patch: |
+      $patch: delete
+      apiVersion: policy/v1
+      kind: PodDisruptionBudget
+      metadata:
+        name: api
+
+  # Nothing to scale onto, and metrics-server is not installed by default on
+  # k3s single-node.
+  - target:
+      kind: HorizontalPodAutoscaler
+      name: api
+    patch: |
+      $patch: delete
+      apiVersion: autoscaling/v2
+      kind: HorizontalPodAutoscaler
+      metadata:
+        name: api
+
+  # maxSurge: 1 with maxUnavailable: 0 needs room for two API pods at once.
+  # On a constrained box the new pod cannot schedule and the rollout stalls, so
+  # accept a moment of downtime instead of a wedged deploy.
+  - target:
+      kind: Deployment
+      name: api
+    patch: |
+      - op: replace
+        path: /spec/strategy
+        value:
+          type: Recreate
+
+  - target:
+      kind: StatefulSet
+      name: postgres
+    patch: |
+      - op: replace
+        path: /spec/volumeClaimTemplates/0/spec/resources/requests/storage
+        value: 5Gi
+
+configMapGenerator:
+  - name: horamind-config
+    behavior: merge
+    literals:
+      - LOG_LEVEL=debug
