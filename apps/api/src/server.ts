@@ -17,6 +17,7 @@ import { sessionRoutes } from './routes/sessions.js';
 import { profileRoutes } from './routes/profiles.js';
 import { memoryRoutes } from './routes/memories.js';
 import { chartRoutes } from './routes/charts.js';
+import { ragRoutes } from './routes/rag.js';
 
 /**
  * Fastify application factory.
@@ -111,6 +112,7 @@ export async function buildServer(env: Env = loadEnv()): Promise<FastifyInstance
     await app.register(profileRoutes, { prefix: '/v1' });
     await app.register(memoryRoutes,  { prefix: '/v1' });
     await app.register(chartRoutes,   { prefix: '/v1' });
+    await app.register(ragRoutes,     { prefix: '/v1' });
 
     return app;
 }
