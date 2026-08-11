@@ -1,27 +1,89 @@
-# Caddy edge configuration.
+# Caddy — internal router behind the Cloudflare Tunnel.
 #
-# Replace `api.example.com` with the real hostname and Caddy will obtain and
-# renew a Let's Encrypt certificate on its own. For a local run without a public
-# DNS name, use `:80` instead of the hostname.
+# Deliberately plain HTTP on :80. TLS is terminated by Cloudflare at the edge,
+# and the hop from cloudflared to Caddy never leaves the compose network. Caddy
+# is not the edge here, so it should not try to obtain a certificate: with no
+# public listener it could not complete an ACME challenge anyway, and would
+# retry forever.
+#
+# Its job is to put the API and the client on ONE origin:
+#
+#     astrology.harieshwar.dev/api/*   → the Fastify API
+#     astrology.harieshwar.dev/*       → the PWA
+#
+# A separate api. subdomain would be simpler to wire and worse to live with: it
+# reintroduces CORS, and it forfeits the ability to keep the refresh token in an
+# httpOnly, SameSite=Strict cookie — which is the meaningful XSS mitigation for
+# a browser client.
 
-{$API_DOMAIN:localhost} {
-	encode zstd gzip
-
-	# The API is the only upstream; there is no static content to serve.
-	reverse_proxy api:8080 {
-		health_uri /health
-		health_interval 30s
-	}
-
-	header {
-		Strict-Transport-Security "max-age=31536000; includeSubDomains"
-		X-Content-Type-Options "nosniff"
-		Referrer-Policy "no-referrer"
-		-Server
-	}
-
+{
+	# No automatic HTTPS: this instance is never the public listener.
+	auto_https off
+	admin off
 	log {
 		output stdout
 		format json
+	}
+}
+
+:80 {
+	encode zstd gzip
+
+	# ---------------------------------------------------------------------
+	# API
+	# ---------------------------------------------------------------------
+	handle /api/* {
+		uri strip_prefix /api
+		reverse_proxy api:8080 {
+			health_uri /health
+			health_interval 30s
+
+			# Chat replies stream token by token. Buffering the response
+			# would hold the whole answer until it finished, which reads as
+			# a hang rather than a stream.
+			flush_interval -1
+
+			# cloudflared already set these from the real client; passing
+			# them through is what makes the API's rate limiter see distinct
+			# users rather than one proxy.
+			header_up X-Real-IP {http.request.header.CF-Connecting-IP}
+			header_up X-Forwarded-Proto https
+		}
+	}
+
+	# OpenAPI document and Swagger UI, non-production only. The API itself
+	# refuses to mount /docs when NODE_ENV=production, so this is belt and
+	# braces rather than the only control.
+	handle /docs* {
+		reverse_proxy api:8080
+	}
+
+	# ---------------------------------------------------------------------
+	# Client
+	# ---------------------------------------------------------------------
+	# Until the PWA exists (Epic 7) this directory is empty and requests fall
+	# through to the 404 below — the API stays fully usable in the meantime.
+	handle {
+		root * /srv/web
+
+		# Hashed build assets are immutable; the service worker and the
+		# manifest are not, and caching them is how a PWA gets stuck showing
+		# a version the user cannot escape.
+		@immutable path /assets/*
+		header @immutable Cache-Control "public, max-age=31536000, immutable"
+
+		@volatile path /sw.js /manifest.webmanifest /index.html
+		header @volatile Cache-Control "no-cache"
+
+		# Client-side routing: unknown paths are app routes, not missing files.
+		try_files {path} /index.html
+		file_server
+	}
+
+	header {
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		X-Frame-Options "DENY"
+		-Server
 	}
 }

@@ -1,0 +1,61 @@
+# Cloudflare Tunnel — HoraMind's own tunnel.
+#
+# Copy to `config.yml` and replace both placeholders with literal values.
+# `config.yml` is gitignored because it names a tunnel UUID and a credentials
+# file.
+#
+# NOTE: cloudflared does NOT expand ${VAR} in this file. Shell-style
+# placeholders are read as literal text and the tunnel fails to start with an
+# unhelpful error. Write the real values in.
+#
+# ---------------------------------------------------------------------------
+# Why a separate tunnel rather than an ingress rule on the existing one
+# ---------------------------------------------------------------------------
+# This machine already runs a tunnel for another application. Two safe options
+# exist, and one unsafe one:
+#
+#   SAFE   A second named tunnel with its own UUID, credentials file and config.
+#          Multiple `cloudflared` processes coexist happily; each authenticates
+#          separately and serves only its own hostnames. This is what we do.
+#
+#   SAFE   Adding an ingress rule to the existing tunnel's config — but that
+#          means editing a file another application owns, and a mistake there
+#          takes *that* app down, not this one.
+#
+#   UNSAFE Running `cloudflared tunnel` with no explicit `--config`. It falls
+#          back to `~/.cloudflared/config.yml`, which is very likely the other
+#          app's. The compose service always passes `--config` for this reason.
+#
+# Nothing here reads or writes the default config path, and the credentials file
+# is mounted read-only.
+
+# The UUID printed by `cloudflared tunnel create horamind`.
+tunnel: 00000000-0000-0000-0000-000000000000
+credentials-file: /etc/cloudflared/creds.json
+
+# DNS is never managed from inside the container. `cloudflared tunnel route dns`
+# is run once, by hand, and creates a CNAME for one hostname only — it cannot
+# disturb records belonging to the other tunnel.
+no-autoupdate: true
+
+# Reachable only inside the compose network; not published to the LAN.
+metrics: 0.0.0.0:2000
+
+ingress:
+  # Everything for this hostname goes to Caddy, which splits the API from the
+  # static client. Serving both under one origin is what lets the refresh token
+  # live in a SameSite=Strict cookie instead of JavaScript-reachable storage —
+  # a separate api. subdomain would forfeit that.
+  - hostname: astrology.harieshwar.dev
+    service: http://caddy:80
+    originRequest:
+      # Cloudflare has already terminated TLS at the edge; inside the compose
+      # network this hop is plain HTTP between two containers.
+      connectTimeout: 10s
+      # Chat responses stream token by token, so the origin must not be
+      # buffered — otherwise the whole reply lands at once after a long pause.
+      disableChunkedEncoding: false
+
+  # Required terminal rule: anything not matched above is refused. cloudflared
+  # will not start without it.
+  - service: http_status:404

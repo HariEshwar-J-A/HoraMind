@@ -1,0 +1,6 @@
+Placeholder for the built PWA (Epic 7).
+
+Caddy bind-mounts this directory at /srv/web. Docker creates a missing bind
+source as a root-owned directory, which then fails to serve — so the path is
+committed empty rather than left to chance. Point WEB_DIST_PATH at the real
+build output once it exists.
