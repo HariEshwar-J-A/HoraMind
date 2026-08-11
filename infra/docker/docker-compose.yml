@@ -113,22 +113,52 @@ services:
           memory: 768M
     networks: [internal]
 
-  # TLS terminator. Caddy obtains and renews certificates automatically, which
-  # on a home box is the difference between having HTTPS and meaning to.
-  # Enable with: docker compose --profile edge up -d
+  # Internal router. Puts the API and the client on one origin so the browser
+  # sees no cross-site request and the refresh cookie can be SameSite=Strict.
+  # Plain HTTP: TLS is Cloudflare's job at the edge.
   caddy:
     image: caddy:2-alpine
-    profiles: [edge]
+    profiles: [tunnel, edge]
     restart: unless-stopped
-    ports:
-      - "80:80"
-      - "443:443"
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ${WEB_DIST_PATH:-./web-placeholder}:/srv/web:ro
       - caddy_data:/data
       - caddy_config:/config
     depends_on: [api]
     networks: [internal]
+
+  # Cloudflare Tunnel.
+  #
+  # This machine already runs a tunnel for another application, so this is a
+  # SECOND, independent one: its own UUID, its own credentials, its own config.
+  # `--config` is passed explicitly on every invocation — without it cloudflared
+  # falls back to ~/.cloudflared/config.yml, which is very likely the other
+  # app's, and would hand this app's ingress rules to that tunnel.
+  #
+  # Run ./infra/scripts/tunnel-preflight.sh before first use.
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    profiles: [tunnel]
+    restart: unless-stopped
+    command: tunnel --config /etc/cloudflared/config.yml --no-autoupdate run
+    environment:
+      # The tunnel UUID and hostname live in config.yml as literals, because
+      # cloudflared does not expand ${VAR} in its configuration file.
+      TUNNEL_METRICS: 0.0.0.0:2000
+    volumes:
+      # Read-only, and scoped to this tunnel's own directory. Nothing here can
+      # reach the other tunnel's credentials or configuration.
+      - ./cloudflared/config.yml:/etc/cloudflared/config.yml:ro
+      - ./cloudflared/creds.json:/etc/cloudflared/creds.json:ro
+    depends_on: [caddy]
+    # Outbound only. No ports are published, no router configuration changes,
+    # and the home IP address is never in public DNS.
+    networks: [internal]
+    deploy:
+      resources:
+        limits:
+          memory: 128M
 
 volumes:
   postgres_data:
