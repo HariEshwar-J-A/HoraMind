@@ -1,0 +1,102 @@
+#cloud-config
+#
+# First-boot provisioning: harden SSH, mount the data volume, install k3s.
+#
+# Everything here is idempotent and safe to re-run, because cloud-init is not
+# the place to discover that a rebuild behaves differently from a first boot.
+
+package_update: true
+package_upgrade: true
+
+packages:
+  - ufw
+  - fail2ban
+  - unattended-upgrades
+  - curl
+  - gnupg
+
+users:
+  - name: horamind
+    groups: [sudo]
+    shell: /bin/bash
+    sudo: ["ALL=(ALL) NOPASSWD:ALL"]
+    ssh_authorized_keys: []
+
+write_files:
+  # Defence in depth. The Hetzner firewall already blocks everything but SSH;
+  # this survives a firewall misconfiguration, which is precisely the failure
+  # a second layer is for.
+  - path: /etc/ufw/applications.d/k3s
+    content: |
+      [k3s]
+      title=k3s API
+      description=Kubernetes API server
+      ports=6443/tcp
+
+  - path: /etc/apt/apt.conf.d/20auto-upgrades
+    content: |
+      APT::Periodic::Update-Package-Lists "1";
+      APT::Periodic::Unattended-Upgrade "1";
+
+  # k3s defaults include Traefik and ServiceLB. Neither is wanted: ingress
+  # arrives through the Cloudflare Tunnel, so an ingress controller would be an
+  # unused public listener and ServiceLB would try to bind host ports.
+  - path: /etc/rancher/k3s/config.yaml
+    content: |
+      write-kubeconfig-mode: "0640"
+      disable:
+        - traefik
+        - servicelb
+      # Snapshots of the embedded datastore. Cheap insurance against a bad
+      # apply, and unrelated to the Postgres backups.
+      etcd-snapshot-schedule-cron: "0 4 * * *"
+      etcd-snapshot-retention: 7
+
+runcmd:
+  # --- SSH hardening -------------------------------------------------------
+  - sed -i 's/^#\?PasswordAuthentication.*/PasswordAuthentication no/' /etc/ssh/sshd_config
+  - sed -i 's/^#\?PermitRootLogin.*/PermitRootLogin prohibit-password/' /etc/ssh/sshd_config
+  - systemctl restart ssh
+
+  # --- Host firewall -------------------------------------------------------
+  - ufw --force reset
+  - ufw default deny incoming
+  - ufw default allow outgoing
+  - ufw allow OpenSSH
+  - ufw --force enable
+
+  # --- Data volume ---------------------------------------------------------
+  # Formatted by Hetzner at creation, so it is only formatted here if that
+  # somehow did not happen. Formatting unconditionally would erase the database
+  # on every rebuild, which is the single worst thing this file could do.
+  - |
+    if ! blkid ${volume_device}; then
+      mkfs.ext4 -F ${volume_device}
+    fi
+  - mkdir -p /mnt/data
+  - |
+    grep -q "${volume_device}" /etc/fstab || \
+      echo "${volume_device} /mnt/data ext4 discard,nofail,defaults 0 0" >> /etc/fstab
+  - mount -a
+  - mkdir -p /mnt/data/k3s-storage
+  - chmod 0755 /mnt/data/k3s-storage
+
+  # --- k3s -----------------------------------------------------------------
+  # local-path provisioner writes to the attached volume rather than the boot
+  # disk, so PVCs live on the disk that survives a server rebuild.
+  - |
+    curl -sfL https://get.k3s.io | \
+      INSTALL_K3S_CHANNEL="${k3s_version}" \
+      sh -s - server --default-local-storage-path /mnt/data/k3s-storage
+  - systemctl enable k3s
+
+  - fail2ban-client start || true
+
+final_message: |
+  HoraMind node ready after $UPTIME seconds.
+
+  Next, from your workstation:
+    scp root@<ip>:/etc/rancher/k3s/k3s.yaml ~/.kube/horamind.yaml
+    # replace 127.0.0.1 with the server address in that file
+    kubectl --kubeconfig ~/.kube/horamind.yaml create secret generic horamind-secrets ...
+    kubectl --kubeconfig ~/.kube/horamind.yaml apply -k infra/k8s/overlays/home

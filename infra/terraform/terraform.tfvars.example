@@ -1,0 +1,20 @@
+# Copy to terraform.tfvars and fill in. That file is gitignored.
+
+# Hetzner Cloud > Security > API tokens, with read/write scope.
+hcloud_token = "REPLACE_ME"
+
+# Your public key. Password auth is disabled on the host.
+ssh_public_key = "ssh-ed25519 AAAA... you@example.com"
+
+# Your own address. There is deliberately no default: leaving SSH open to
+# 0.0.0.0/0 exposes the one port this host has to the whole internet.
+#   curl -s ifconfig.me
+ssh_allowed_ips = ["203.0.113.4/32"]
+
+# cax11: 2 ARM64 vCPU, 4 GB, ~EUR 4/mo — fits the whole stack.
+# cax21: 4 vCPU, 8 GB — for a larger corpus or more replicas.
+server_type = "cax11"
+
+location         = "nbg1"
+data_volume_size = 10
+enable_snapshots = true

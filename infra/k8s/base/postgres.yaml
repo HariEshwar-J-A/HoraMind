@@ -1,0 +1,154 @@
+# PostgreSQL.
+#
+# A StatefulSet rather than a Deployment: the identity and the volume have to
+# survive a reschedule together. A Deployment with a PVC looks equivalent until
+# a rolling update starts a second pod against the same data directory, which
+# Postgres refuses to survive.
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+  namespace: horamind
+  labels: { app: postgres }
+spec:
+  # Headless: the StatefulSet gets a stable DNS name and no load balancing,
+  # which is what a single-writer database wants.
+  clusterIP: None
+  selector: { app: postgres }
+  ports:
+    - port: 5432
+      targetPort: 5432
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: postgres
+  namespace: horamind
+spec:
+  serviceName: postgres
+  replicas: 1
+  selector:
+    matchLabels: { app: postgres }
+  template:
+    metadata:
+      labels: { app: postgres }
+    spec:
+      securityContext:
+        # The official image's postgres user.
+        fsGroup: 999
+        runAsUser: 999
+        runAsGroup: 999
+      containers:
+        - name: postgres
+          image: postgres:16-alpine
+          ports:
+            - containerPort: 5432
+          env:
+            - name: POSTGRES_USER
+              valueFrom: { secretKeyRef: { name: horamind-secrets, key: POSTGRES_USER } }
+            - name: POSTGRES_PASSWORD
+              valueFrom: { secretKeyRef: { name: horamind-secrets, key: POSTGRES_PASSWORD } }
+            - name: POSTGRES_DB
+              valueFrom: { secretKeyRef: { name: horamind-secrets, key: POSTGRES_DB } }
+            # The image only runs initdb when the data directory is empty, and
+            # mounting a PVC at /var/lib/postgresql/data leaves lost+found
+            # behind on some CSI drivers — which is not empty. A subdirectory
+            # avoids that entirely.
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+            - name: POSTGRES_INITDB_ARGS
+              value: "--data-checksums"
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+          readinessProbe:
+            exec:
+              command: ["sh", "-c", "pg_isready -U $POSTGRES_USER -d $POSTGRES_DB"]
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            exec:
+              command: ["sh", "-c", "pg_isready -U $POSTGRES_USER -d $POSTGRES_DB"]
+            # Generous: a slow checkpoint under load must not be mistaken for a
+            # dead database and restarted mid-write.
+            initialDelaySeconds: 60
+            periodSeconds: 30
+            failureThreshold: 5
+          resources:
+            requests: { memory: 256Mi, cpu: 100m }
+            limits:   { memory: 512Mi }
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: [ReadWriteOnce]
+        resources:
+          requests:
+            storage: 10Gi
+---
+# Nightly logical backup.
+#
+# pg_dump rather than a filesystem snapshot: a dump restores into any Postgres
+# version and can be inspected, which matters far more at this scale than the
+# speed a physical backup would buy.
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: postgres-backup
+  namespace: horamind
+spec:
+  schedule: "17 3 * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            app: postgres-backup
+            needs-postgres: "true"
+        spec:
+          restartPolicy: OnFailure
+          containers:
+            - name: dump
+              image: postgres:16-alpine
+              command: ["/bin/sh", "-c"]
+              args:
+                - |
+                  set -eu
+                  stamp=$(date -u +%Y%m%dT%H%M%SZ)
+                  out="/backups/horamind-${stamp}.sql.gz"
+                  pg_dump -h postgres -U "$POSTGRES_USER" -d "$POSTGRES_DB" \
+                      --no-owner --no-privileges | gzip -9 > "$out"
+                  # A zero-byte dump is worse than none: it looks like a backup.
+                  test -s "$out"
+                  echo "wrote $out ($(wc -c < "$out") bytes)"
+                  # Keep two weeks. Longer needs off-box storage, which a home
+                  # deployment does not have and should not pretend to.
+                  find /backups -name 'horamind-*.sql.gz' -mtime +14 -delete
+              env:
+                - name: POSTGRES_USER
+                  valueFrom: { secretKeyRef: { name: horamind-secrets, key: POSTGRES_USER } }
+                - name: POSTGRES_DB
+                  valueFrom: { secretKeyRef: { name: horamind-secrets, key: POSTGRES_DB } }
+                - name: PGPASSWORD
+                  valueFrom: { secretKeyRef: { name: horamind-secrets, key: POSTGRES_PASSWORD } }
+              volumeMounts:
+                - name: backups
+                  mountPath: /backups
+          volumes:
+            - name: backups
+              persistentVolumeClaim:
+                claimName: postgres-backups
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgres-backups
+  namespace: horamind
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests:
+      storage: 5Gi

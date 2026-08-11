@@ -81,6 +81,36 @@ jobs:
           JWT_SECRET: ci-only-secret-not-used-anywhere-real-0000
         run: npm test
 
+  manifests:
+    name: Validate infrastructure manifests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # kubeconform checks manifests against the real Kubernetes schemas, which
+      # catches a mistyped field that YAML parsing happily accepts. The
+      # kustomize build must succeed first: an overlay patch targeting a
+      # resource that no longer exists fails silently until deploy day.
+      - name: Install tools
+        run: |
+          curl -sSLo kubeconform.tar.gz             https://github.com/yannh/kubeconform/releases/latest/download/kubeconform-linux-amd64.tar.gz
+          tar xf kubeconform.tar.gz && sudo mv kubeconform /usr/local/bin/
+          curl -s "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh" | bash
+          sudo mv kustomize /usr/local/bin/
+
+      - name: Build and validate the home overlay
+        run: |
+          kustomize build infra/k8s/overlays/home > /tmp/rendered.yaml
+          kubeconform -strict -summary -ignore-missing-schemas /tmp/rendered.yaml
+
+      - name: Terraform formatting and validation
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.9.8"
+      - run: terraform -chdir=infra/terraform fmt -check -diff
+      - run: terraform -chdir=infra/terraform init -backend=false
+      - run: terraform -chdir=infra/terraform validate
+
   image:
     name: Build container image
     runs-on: ubuntu-latest
