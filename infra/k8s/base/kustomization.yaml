@@ -11,8 +11,19 @@ resources:
   - api.yaml
   - edge.yaml
 
-commonLabels:
-  app.kubernetes.io/part-of: horamind
+# Replaces the deprecated `commonLabels`, and deliberately not a like-for-like
+# swap: `commonLabels` also injected the label into every selector, including
+# `Deployment.spec.selector` and `StatefulSet.spec.selector`, which Kubernetes
+# treats as immutable after creation. Changing or removing the label later
+# would then require deleting and recreating the workload.
+#
+# `includeSelectors: false` labels the objects for discovery — `kubectl get all
+# -l app.kubernetes.io/part-of=horamind` still works — while leaving the
+# selectors owned by the manifests that declare them.
+labels:
+  - pairs:
+      app.kubernetes.io/part-of: horamind
+    includeSelectors: false
 
 images:
   - name: ghcr.io/harieshwar-j-a/horamind-api
