@@ -25,6 +25,8 @@ export async function compassRoutes(app: FastifyInstance): Promise<void> {
 
     typed.get('/compass', {
         onRequest: [app.authenticate],
+        // Generation is cached per day, but a cache miss is a paid completion.
+        config: { rateLimit: { max: 20, timeWindow: '1 minute' } },
         schema: {
             tags: ['compass'],
             description:
