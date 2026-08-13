@@ -1,5 +1,6 @@
 import { describe, test, expect, beforeAll, afterAll } from 'vitest';
 import postgres from 'postgres';
+import { POOL_OPTIONS } from '../../src/db/client.js';
 import { execFileSync } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -27,7 +28,11 @@ let reachable = false;
 
 beforeAll(async () => {
     try {
-        sql = postgres(DATABASE_URL, { max: 4, connect_timeout: 3, onnotice: () => {} });
+        // Same options the application uses, imported rather than repeated.
+        // `transform: postgres.camel` renames every column on the way out, so a
+        // test client without it sees `table_name` where the app sees
+        // `tableName` — and then tests a database the application never meets.
+        sql = postgres(DATABASE_URL, { ...POOL_OPTIONS, max: 4, connect_timeout: 3 });
         await sql`SELECT 1`;
         reachable = true;
     } catch {
@@ -72,6 +77,24 @@ describe('migrations', () => {
         });
         expect(out).toMatch(/up to date/i);
     }, 60_000);
+
+    it('returns snake_case columns as camelCase, as every repo assumes', async () => {
+        // The repositories all read `row.publicId`, `row.lastSeenAt` and so on.
+        // That only works because of `transform: postgres.camel`. If the option
+        // were ever dropped, every one of them would silently read undefined
+        // rather than fail — so the contract is asserted directly.
+        const [row] = await sql<{ publicId: string; createdAt: Date }[]>`
+            SELECT public_id, created_at FROM users LIMIT 1`;
+        if (row) {
+            expect(row.publicId).toBeDefined();
+            expect(row.createdAt).toBeInstanceOf(Date);
+        }
+
+        const [meta] = await sql<{ tableName: string }[]>`
+            SELECT table_name FROM information_schema.tables
+             WHERE table_schema = 'public' LIMIT 1`;
+        expect(meta?.tableName).toBeTypeOf('string');
+    });
 
     it('created every table the application reads', async () => {
         const rows = await sql<{ tableName: string }[]>`
