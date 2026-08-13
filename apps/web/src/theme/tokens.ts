@@ -33,6 +33,65 @@ export const colors = {
     overlay: 'rgba(11, 13, 23, 0.72)',
 } as const;
 
+/**
+ * Astronomical-instrument accents.
+ *
+ * The palette above is a night sky; these are the brass laid on it. The
+ * reference is an astrolabe rather than a dashboard: engraved hairlines, gold
+ * leaf catching light at one edge, and nothing that glows for its own sake.
+ * Three golds rather than one because a single flat accent reads as printed,
+ * and an instrument reads as *made*.
+ */
+export const brass = {
+    light: '#E8CE7A',
+    mid: '#C9A227',
+    deep: '#8A6D18',
+    /** Engraved lines on the chart: visible, never competing with the glyphs. */
+    engrave: '#3A4160',
+    engraveFaint: '#232941',
+    glow: 'rgba(201, 162, 39, 0.35)',
+} as const;
+
+/**
+ * Motion.
+ *
+ * Durations and easings as plain data so a React Native port feeds the same
+ * numbers to Reanimated. The long `slow` is for orbital movement, where the
+ * whole point is that a planet takes visible time to travel to its house.
+ *
+ * `standard` is a gentle overshoot — things arriving in an orbit settle rather
+ * than stop dead. `exit` is deliberately faster than `enter`: a screen leaving
+ * should get out of the way, and matching the two makes navigation feel sticky.
+ */
+export const motion = {
+    fast: 0.18,
+    base: 0.32,
+    slow: 0.9,
+    orbital: 1.4,
+    /** cubic-bezier control points, valid for both Motion and Reanimated. */
+    standard: [0.22, 1, 0.36, 1],
+    exit: [0.4, 0, 1, 1],
+    /** Seconds between siblings in a staggered reveal. */
+    stagger: 0.055,
+} as const;
+
+/**
+ * Type families.
+ *
+ * A serif for anything that names a celestial body. It is doing real work: the
+ * subject is a 1500-year-old text tradition, and a geometric sans makes a
+ * nakshatra look like a SaaS metric. Both stacks are system-resident on Apple
+ * and Android, so nothing is fetched — which matters for a PWA that is supposed
+ * to open offline, and a webfont would be the one asset the service worker
+ * could not guarantee.
+ */
+export const fonts = {
+    display: "'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia, 'Times New Roman', serif",
+    body: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
+    /** Tabular figures keep degree columns from shifting as values change. */
+    mono: "ui-monospace, SFMono-Regular, 'SF Mono', Menlo, monospace",
+} as const;
+
 /** A 4-point scale. Everything spatial is a multiple, so nothing is arbitrary. */
 export const space = {
     xs: 4, sm: 8, md: 12, lg: 16, xl: 24, xxl: 32, xxxl: 48,

@@ -3,10 +3,12 @@ import {
     BrowserRouter, Routes, Route, Navigate, NavLink, useLocation,
 } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { motion as m, useReducedMotion } from 'motion/react';
 
 import { ROUTES, TABS } from './routes/routes.js';
 import { useSession } from './lib/session.js';
-import { colors, space, touchTarget } from './theme/tokens.js';
+import { Starfield } from './components/astro/Starfield.js';
+import { brass, colors, fonts, motion as mo, space, touchTarget } from './theme/tokens.js';
 
 import { SignIn } from './screens/SignIn.js';
 import { Onboarding } from './screens/Onboarding.js';
@@ -64,14 +66,33 @@ function Guard({ children, requiresAuth, requiresProfile }: {
     return <>{children}</>;
 }
 
+/**
+ * Shown while the session is being restored.
+ *
+ * It breathes rather than spinning. This appears for a few hundred
+ * milliseconds on a warm start, and a spinner in that window reads as an error
+ * state — something is *wrong* enough to need loading — where a slow pulse
+ * reads as the app waking up.
+ */
 function Splash() {
+    const still = useReducedMotion();
+
     return (
         <div style={{
-            minHeight: '100vh', backgroundColor: colors.background,
+            minHeight: '100vh',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            color: colors.textFaint, fontSize: 14,
+            flexDirection: 'column', gap: space.md,
         }}>
-            HoraMind
+            <m.div
+                animate={still ? undefined : { opacity: [0.35, 1, 0.35], scale: [0.98, 1, 0.98] }}
+                transition={still ? undefined : { duration: 2.4, repeat: Infinity, ease: 'easeInOut' }}
+                style={{
+                    fontFamily: fonts.display, fontSize: 26,
+                    color: brass.mid, letterSpacing: 2,
+                }}
+            >
+                HoraMind
+            </m.div>
         </div>
     );
 }
@@ -101,18 +122,93 @@ function TabBar() {
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
+                        position: 'relative',
                         paddingTop: space.md,
                         paddingBottom: space.md,
                         fontSize: 13,
                         fontWeight: isActive ? 600 : 400,
                         color: isActive ? colors.accent : colors.textMuted,
                         textDecoration: 'none',
+                        transition: 'color 180ms ease',
                     })}
                 >
-                    {tab.tabLabel}
+                    {({ isActive }) => (
+                        <>
+                            {/* One indicator, shared across tabs by `layoutId`:
+                                Motion tweens it from the old tab's position to
+                                the new one instead of cross-fading two bars, so
+                                the mark travels and the movement names which
+                                direction you went. */}
+                            {isActive && (
+                                <m.span
+                                    layoutId="hm-tab-indicator"
+                                    transition={{ type: 'spring', stiffness: 420, damping: 34 }}
+                                    style={{
+                                        position: 'absolute', top: 0,
+                                        left: '22%', right: '22%', height: 2,
+                                        backgroundColor: brass.mid,
+                                        borderBottomLeftRadius: 2, borderBottomRightRadius: 2,
+                                    }}
+                                />
+                            )}
+                            {tab.tabLabel}
+                        </>
+                    )}
                 </NavLink>
             ))}
         </nav>
+    );
+}
+
+/**
+ * The routed area, with a transition on arrival.
+ *
+ * Split out of `App` only because `useLocation` has to be called inside the
+ * router.
+ *
+ * Entry only, and no `AnimatePresence`. That is not a shortcut — it is the one
+ * arrangement that does not deadlock the router. `AnimatePresence` keeps the
+ * *outgoing* subtree mounted for the length of its exit, so a second, stale
+ * `<Routes>` stays live; the `Guard` inside it re-evaluates against the new
+ * session, renders `<Navigate>` again, and the two trees push each other back
+ * and forth until React gives up with "Maximum update depth exceeded". Any
+ * route tree containing a declarative redirect has the same problem.
+ *
+ * Keying this wrapper on the path instead gives a clean remount: exactly one
+ * live `<Routes>`, one redirect, and the incoming screen still animates. The
+ * screens stagger their own contents in on top of it, which is where nearly all
+ * of the movement is felt anyway.
+ */
+function RoutedScreens() {
+    const location = useLocation();
+    const still = useReducedMotion();
+
+    return (
+        <m.div
+            key={location.pathname}
+            initial={{ opacity: 0, y: still ? 0 : 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: still ? 0.01 : mo.base, ease: mo.standard }}
+        >
+            <Routes>
+                {ROUTES.map(route => {
+                    const Screen = SCREENS[route.screen];
+                    if (!Screen) return null;
+                    return (
+                        <Route
+                            key={route.path}
+                            path={route.path}
+                            element={
+                                <Guard requiresAuth={route.requiresAuth} requiresProfile={route.requiresProfile}>
+                                    <Screen />
+                                </Guard>
+                            }
+                        />
+                    );
+                })}
+                <Route path="*" element={<Navigate to="/" replace />} />
+            </Routes>
+        </m.div>
     );
 }
 
@@ -123,25 +219,9 @@ export function App() {
 
     return (
         <QueryClientProvider client={queryClient}>
+            <Starfield />
             <BrowserRouter>
-                <Routes>
-                    {ROUTES.map(route => {
-                        const Screen = SCREENS[route.screen];
-                        if (!Screen) return null;
-                        return (
-                            <Route
-                                key={route.path}
-                                path={route.path}
-                                element={
-                                    <Guard requiresAuth={route.requiresAuth} requiresProfile={route.requiresProfile}>
-                                        <Screen />
-                                    </Guard>
-                                }
-                            />
-                        );
-                    })}
-                    <Route path="*" element={<Navigate to="/" replace />} />
-                </Routes>
+                <RoutedScreens />
                 <TabBar />
             </BrowserRouter>
         </QueryClientProvider>

@@ -143,7 +143,10 @@ export function Screen({ children, title }: { children: ReactNode; title?: strin
     return (
         <Box style={{
             minHeight: '100vh',
-            backgroundColor: colors.background,
+            // Transparent, not the background colour: the starfield is painted
+            // once behind the whole app, and a screen that paints over it would
+            // put every page in a black box on top of the sky.
+            backgroundColor: 'transparent',
             padding: space.lg,
             // Keep content clear of the notch and the home indicator.
             paddingTop: 'calc(env(safe-area-inset-top) + 16px)',
