@@ -57,8 +57,16 @@ patches:
         path: /spec/volumeClaimTemplates/0/spec/resources/requests/storage
         value: 5Gi
 
-configMapGenerator:
-  - name: horamind-config
-    behavior: merge
-    literals:
-      - LOG_LEVEL=debug
+  # Verbose logging on the box where someone is actually watching the output.
+  #
+  # A patch, not a `configMapGenerator` with `behavior: merge`. That merge only
+  # applies to a ConfigMap produced by another *generator*; horamind-config is
+  # a plain resource in the base, so kustomize finds nothing to merge into and
+  # fails with "does not exist; cannot merge or replace".
+  - target:
+      kind: ConfigMap
+      name: horamind-config
+    patch: |
+      - op: replace
+        path: /data/LOG_LEVEL
+        value: debug
