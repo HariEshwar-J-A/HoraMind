@@ -30,6 +30,7 @@ export const ROUTES: RouteDef[] = [
 
     { path: '/',        screen: 'Today',    tabLabel: 'Today',   requiresAuth: true, requiresProfile: true, title: 'Today' },
     { path: '/chart',   screen: 'Chart',    tabLabel: 'Chart',   requiresAuth: true, requiresProfile: true, title: 'Your chart' },
+    { path: '/calendar', screen: 'Calendar', tabLabel: 'Days',   requiresAuth: true, requiresProfile: true, title: 'Calendar' },
     { path: '/ask',     screen: 'Ask',      tabLabel: 'Ask',     requiresAuth: true, requiresProfile: true, title: 'Ask' },
     { path: '/you',     screen: 'You',      tabLabel: 'You',     requiresAuth: true, requiresProfile: true, title: 'You' },
 
