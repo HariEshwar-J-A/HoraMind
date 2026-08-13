@@ -7,6 +7,7 @@ import { motion as m, useReducedMotion } from 'motion/react';
 
 import { ROUTES, TABS } from './routes/routes.js';
 import { useSession } from './lib/session.js';
+import { installPrefsStorage } from './lib/prefs.js';
 import { Starfield } from './components/astro/Starfield.js';
 import { brass, colors, fonts, motion as mo, space, touchTarget } from './theme/tokens.js';
 
@@ -211,6 +212,19 @@ function RoutedScreens() {
         </m.div>
     );
 }
+
+/*
+ * The one place display preferences may touch the browser.
+ *
+ * `lib/prefs.ts` is forbidden from naming `localStorage` — the same lint rule
+ * that keeps the rest of `lib/` portable — so the port is installed here, in
+ * the shell, which is already DOM-aware. A React Native port swaps these four
+ * lines for `AsyncStorage` and the store above never learns the difference.
+ */
+installPrefsStorage({
+    get: key => { try { return localStorage.getItem(key); } catch { return null; } },
+    set: (key, value) => { try { localStorage.setItem(key, value); } catch { /* private mode */ } },
+});
 
 export function App() {
     const restore = useSession(s => s.restore);

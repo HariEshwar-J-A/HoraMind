@@ -4,9 +4,12 @@ import { Reveal, Stagger, StaggerItem } from '../components/motion.js';
 import { Shimmer } from '../components/ai.js';
 import LoadingState from '../components/bui/LoadingState.js';
 import { ChartWheel } from '../components/astro/ChartWheel.js';
+import { SouthChart } from '../components/astro/SouthChart.js';
+import { ChartStyleToggle } from '../components/astro/ChartStyleToggle.js';
 import { NakshatraDial } from '../components/astro/NakshatraDial.js';
 import { graha, natureColor } from '../components/astro/zodiac.js';
 import { api } from '../lib/api.js';
+import { usePrefs } from '../lib/prefs.js';
 import { brass, colors, fonts, space, radius } from '../theme/tokens.js';
 
 /**
@@ -33,6 +36,7 @@ interface NatalResponse {
 }
 
 export function Chart() {
+    const chartStyle = usePrefs(s => s.chartStyle);
     const { data, isLoading, error } = useQuery<NatalResponse>({
         queryKey: ['natal'],
         queryFn: () => api.get('/v1/charts/natal'),
@@ -72,10 +76,13 @@ export function Chart() {
                 </Notice>
             )}
 
-            <ChartWheel
-                ascendantSign={data.ascendant.sign}
-                planets={data.planets}
-            />
+            <ChartStyleToggle />
+
+            {chartStyle === 'north' ? (
+                <ChartWheel ascendantSign={data.ascendant.sign} planets={data.planets} />
+            ) : (
+                <SouthChart ascendantSign={data.ascendant.sign} planets={data.planets} />
+            )}
 
             <Reveal delay={0.55}>
                 <Card style={{ textAlign: 'center' }}>
