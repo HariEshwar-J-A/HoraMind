@@ -5,6 +5,8 @@ import { buildServer } from '../src/server.js';
 import { loadEnv, resetEnv } from '../src/config/env.js';
 import { resetJwtKey } from '../src/lib/jwt.js';
 import { searchPlaces, timezoneForCoordinates } from '../src/lib/places.js';
+import { toBirthProfile, type ProfileRow } from '../src/repos/profiles.js';
+import { contextFor } from '../src/services/charts.js';
 
 /**
  * Domain layer tests.
@@ -20,6 +22,67 @@ const TEST_ENV = {
     JWT_SECRET: 'test-only-secret-at-least-thirty-two-chars-long',
     LOG_LEVEL: 'silent',
 } as NodeJS.ProcessEnv;
+
+/**
+ * `birth_date` is a Postgres `date`, and postgres.js hands it back as a JS
+ * `Date` at UTC midnight rather than as a string. Two things follow, and both
+ * have to be got right:
+ *
+ *   * The wire format is `YYYY-MM-DD`. A `Date` serialised any other way fails
+ *     response validation and the route answers 500 — every read of a profile,
+ *     not an edge case.
+ *   * It must be rendered from its UTC components. Anything that formats in
+ *     local time reports the previous day everywhere west of Greenwich, which
+ *     is a wrong chart rather than a visibly broken one.
+ */
+describe('profile row mapping', () => {
+    const row = {
+        id: '0b7b7f8e-1f3a-4a2e-9c6d-0f9d3a1b2c3d',
+        userId: 'c3d4e5f6-1111-2222-3333-444455556666',
+        label: 'Me',
+        isPrimary: true,
+        birthDate: new Date('1990-08-15T00:00:00.000Z'),
+        birthTime: '14:30:00',
+        timeAccuracy: 'exact',
+        placeName: 'Chennai, Tamil Nadu, India',
+        latitude: '13.08998781',
+        longitude: '80.27999874',
+        timezone: 'Asia/Kolkata',
+        ayanamsa: 'true_chitra',
+        nodeType: 'true',
+        positionMode: 'geocentric',
+        houseSystem: 'whole_sign',
+        dasamsaScheme: 'parasara',
+        horaScheme: 'parasara',
+        createdAt: new Date('2026-01-01T00:00:00.000Z'),
+        updatedAt: new Date('2026-01-01T00:00:00.000Z'),
+    } satisfies ProfileRow;
+
+    test('renders a driver Date as the stored calendar day', () => {
+        expect(toBirthProfile(row).birthDate).toBe('1990-08-15');
+    });
+
+    test('passes a string birth date through untouched', () => {
+        expect(toBirthProfile({ ...row, birthDate: '1990-08-15' }).birthDate).toBe('1990-08-15');
+    });
+
+    /**
+     * The chart service reads the row directly rather than the wire shape, so
+     * it needs the same conversion. It resolves the birth moment in the birth
+     * timezone — 14:30 in Asia/Kolkata is 09:00 UTC — and a mis-parsed date
+     * surfaces here as an invalid instant rather than as a bad chart.
+     */
+    test('builds the birth moment from a driver Date in the birth timezone', () => {
+        const ctx = contextFor(row);
+        expect(ctx.dt.toISO()).toBe('1990-08-15T14:30:00.000+05:30');
+        expect(ctx.dt.toUTC().toISO()).toBe('1990-08-15T09:00:00.000Z');
+    });
+
+    test('builds the same moment from a string birth date', () => {
+        const ctx = contextFor({ ...row, birthDate: '1990-08-15' });
+        expect(ctx.dt.toUTC().toISO()).toBe('1990-08-15T09:00:00.000Z');
+    });
+});
 
 describe('place lookup', () => {
     test('resolves a known city with coordinates and an IANA timezone', () => {
