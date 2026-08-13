@@ -198,6 +198,47 @@ describe('session recovery', () => {
         expect(useSession.getState().profile).toBeNull();
     });
 
+    /**
+     * The route guard sends an authenticated user with no profile to
+     * onboarding. That is right for a new account and wrong for everyone else,
+     * and the difference is entirely a matter of when `status` flips: while a
+     * fetch for the profile is still in flight, `profile: null` means "not
+     * asked yet", not "never onboarded". Announce the session before the
+     * profile lands and the guard reads the placeholder as an answer, redirects
+     * with `replace`, and leaves an onboarded user staring at the onboarding
+     * form after every reload — with no history entry to go back to.
+     */
+    test('does not report a session until the profile is known', async () => {
+        const { useSession } = await import('../src/lib/session.js');
+
+        useSession.setState({ user: null, profile: null, status: 'unknown' });
+
+        const seen: Array<{ status: string; profile: unknown }> = [];
+        const unsubscribe = useSession.subscribe(s => {
+            seen.push({ status: s.status, profile: s.profile });
+        });
+
+        vi.stubGlobal('fetch', vi.fn(async (url: string) => {
+            if (String(url).includes('/v1/profiles')) {
+                return new Response(
+                    JSON.stringify({ profiles: [{ id: 'p1', isPrimary: true }] }),
+                    { status: 200 },
+                );
+            }
+            return new Response(JSON.stringify({ publicId: 'A1B2C3D4' }), { status: 200 });
+        }));
+
+        await useSession.getState().restore();
+        unsubscribe();
+
+        expect(useSession.getState().status).toBe('authenticated');
+        expect(useSession.getState().profile).not.toBeNull();
+
+        // The guard reads both together, so no observable state may ever pair
+        // "authenticated" with a profile that has not been fetched.
+        expect(seen.filter(s => s.status === 'authenticated' && s.profile === null)).toEqual([]);
+    });
+
     test('signing out clears local state even when the server call fails', async () => {
         // A user who taps sign out and stays signed in has been ignored.
         const { useSession } = await import('../src/lib/session.js');

@@ -80,8 +80,17 @@ export const useSession = create<SessionState>((set, get) => ({
             // the httpOnly refresh cookie is still valid, which is exactly the
             // question being asked.
             const user = await api.get<PublicUser>('/v1/auth/me');
-            set({ user, status: 'authenticated' });
+
+            // Resolve the profile *before* announcing the session, and leave
+            // `status` at 'unknown' until then so the guard shows the splash
+            // rather than deciding. A null profile is how the guard recognises
+            // an account that has not onboarded; while this fetch is in flight
+            // it only means "not asked yet". Publishing 'authenticated' first
+            // lets the guard read that placeholder as an answer and redirect an
+            // onboarded user to /onboarding — with `replace`, so there is not
+            // even a history entry back.
             await get().loadProfile();
+            set({ user, status: 'authenticated' });
         } catch {
             set({ user: null, profile: null, status: 'anonymous' });
         }
