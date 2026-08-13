@@ -23,6 +23,7 @@ import { interpretRoutes } from './routes/interpret.js';
 import { chatRoutes } from './routes/chat.js';
 import { compassRoutes } from './routes/compass.js';
 import { calendarRoutes } from './routes/calendar.js';
+import { lifeRoutes } from './routes/life.js';
 import { retentionPlugin } from './plugins/retention.js';
 
 /**
@@ -130,6 +131,7 @@ export async function buildServer(env: Env = loadEnv()): Promise<FastifyInstance
     await app.register(chatRoutes,    { prefix: '/v1' });
     await app.register(compassRoutes, { prefix: '/v1' });
     await app.register(calendarRoutes, { prefix: '/v1' });
+    await app.register(lifeRoutes,     { prefix: '/v1' });
 
     return app;
 }

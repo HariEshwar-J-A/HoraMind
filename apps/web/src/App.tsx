@@ -16,6 +16,7 @@ import { Onboarding } from './screens/Onboarding.js';
 import { Today } from './screens/Today.js';
 import { Chart } from './screens/Chart.js';
 import { Calendar } from './screens/Calendar.js';
+import { Life } from './screens/Life.js';
 import { Ask } from './screens/Ask.js';
 import { You } from './screens/You.js';
 import { Devices } from './screens/Devices.js';
@@ -30,7 +31,7 @@ import { Devices } from './screens/Devices.js';
  */
 
 const SCREENS: Record<string, () => JSX.Element> = {
-    SignIn, Onboarding, Today, Chart, Calendar, Ask, You, Devices,
+    SignIn, Onboarding, Today, Chart, Calendar, Ask, You, Life, Devices,
 };
 
 const queryClient = new QueryClient({

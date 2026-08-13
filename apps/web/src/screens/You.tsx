@@ -142,6 +142,12 @@ export function You() {
                 <Txt style={{ fontSize: 14, color: colors.textMuted, marginBottom: space.md }}>
                     {user?.email} · ID {user?.publicId}
                 </Txt>
+                <Button
+                    variant="secondary"
+                    label="Your life — the long reading"
+                    onPress={() => navigate('/you/life')}
+                    style={{ marginBottom: space.sm }}
+                />
                 <Button variant="secondary" label="Signed-in devices"
                         onPress={() => navigate('/you/devices')} />
                 <Button variant="ghost" style={{ marginTop: space.sm }} label="Sign out"
