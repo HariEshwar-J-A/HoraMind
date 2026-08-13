@@ -6,7 +6,7 @@ import { buildServer } from '../src/server.js';
 import { loadEnv, resetEnv } from '../src/config/env.js';
 import { resetJwtKey } from '../src/lib/jwt.js';
 import { estimateTokens, estimateMessageTokens } from '../src/services/compaction.js';
-import { parseCompass, localDate } from '../src/services/compass.js';
+import { parseCompass, localDate, limbName } from '../src/services/compass.js';
 
 /**
  * Chat and compass tests.
@@ -95,6 +95,35 @@ describe('compass parsing', () => {
     test('drops non-string list entries instead of rendering objects', () => {
         const mixed = JSON.stringify({ headline: 'x', dos: ['ok', 42, null, { a: 1 }], donts: [] });
         expect(parseCompass(mixed).dos).toEqual(['ok']);
+    });
+});
+
+/**
+ * The engine returns each limb of the panchanga as `{ index, name, ... }`, not
+ * as a string. Coercing one with `String()` yields `"[object Object]"`, and the
+ * basis is not merely displayed — it *is* the model's entire input, so the
+ * failure is not a cosmetic one. It silently strips the tithi, the nakshatra,
+ * the yoga, the karana and the weekday out of a reading that is supposed to be
+ * computed rather than improvised, and the output still reads perfectly well.
+ */
+describe('compass basis', () => {
+    test('names each limb rather than stringifying the object', () => {
+        expect(limbName({ index: 13, name: 'Vyaghata' })).toBe('Vyaghata');
+        expect(limbName({ index: 25, name: 'Krishna 10', percent: 39.5 })).toBe('Krishna 10');
+    });
+
+    test('keeps the pada, which is what selects the dasha sub-period', () => {
+        expect(limbName({ index: 4, name: 'Rohini', pada: 4, percent: 84.9 })).toBe('Rohini (pada 4)');
+    });
+
+    test('passes a plain string through', () => {
+        expect(limbName('Budhavara')).toBe('Budhavara');
+    });
+
+    test('never emits [object Object], whatever it is handed', () => {
+        for (const input of [{ index: 1 }, {}, null, undefined, 42]) {
+            expect(limbName(input)).not.toContain('[object Object]');
+        }
     });
 });
 
