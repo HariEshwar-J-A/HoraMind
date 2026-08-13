@@ -10,7 +10,21 @@ import tseslint from 'typescript-eslint';
  * and a deadline.
  */
 export default tseslint.config(
-    { ignores: ['dist/**', 'node_modules/**', 'dev-dist/**'] },
+    {
+        ignores: [
+            'dist/**', 'node_modules/**', 'dev-dist/**',
+            /*
+             * Vendored from beautifului.dev, copied rather than authored.
+             *
+             * Holding third-party source to this project's rules means editing
+             * nineteen upstream files, and every edit turns the next update
+             * from a copy into a merge. `atoms.tsx` is deliberately NOT ignored
+             * — we wrote that one, so it is ours to keep clean.
+             */
+            'src/components/bui/*.tsx',
+            '!src/components/bui/atoms.tsx',
+        ],
+    },
     js.configs.recommended,
     ...tseslint.configs.recommended,
     {

@@ -2,7 +2,8 @@ import { useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import { Screen, Card, Button, Txt, Box, Notice } from '../components/primitives.js';
 import { Stagger, StaggerItem } from '../components/motion.js';
-import { StreamingText, Working } from '../components/ai.js';
+import { StreamingText } from '../components/ai.js';
+import LoadingState from '../components/bui/LoadingState.js';
 import { graha, natureColor } from '../components/astro/zodiac.js';
 import { api, ApiError } from '../lib/api.js';
 import { colors, fonts, space, radius, touchTarget } from '../theme/tokens.js';
@@ -76,7 +77,14 @@ export function Ask() {
                 />
             </Card>
 
-            {ask.isPending && <Working label="Reading your chart" />}
+            {ask.isPending && (
+                <Card>
+                    {/* Beautiful UI's loader. The elapsed timer is the honest
+                        part: an interpretation takes real seconds, and a bare
+                        spinner gives no sense of whether it is five or fifty. */}
+                    <LoadingState label="Reading your chart" variant="Orbit" />
+                </Card>
+            )}
 
             {error && <Notice tone="error">{error}</Notice>}
 

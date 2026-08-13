@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Screen, Card, Txt, Box, Notice } from '../components/primitives.js';
 import { Reveal, Stagger, StaggerItem } from '../components/motion.js';
 import { Shimmer } from '../components/ai.js';
+import LoadingState from '../components/bui/LoadingState.js';
 import { ChartWheel } from '../components/astro/ChartWheel.js';
 import { NakshatraDial } from '../components/astro/NakshatraDial.js';
 import { graha, natureColor } from '../components/astro/zodiac.js';
@@ -45,6 +46,9 @@ export function Chart() {
                 {/* Shaped like the answer: a square, then rows. Skeletons that
                     match the eventual layout stop the page jumping when it
                     arrives. */}
+                <Box style={{ marginBottom: space.lg }}>
+                    <LoadingState label="Computing your chart" variant="Orbit" />
+                </Box>
                 <Box style={{ display: 'flex', justifyContent: 'center', marginBottom: space.lg }}>
                     <Shimmer height={300} width={300} radius={radius.lg} />
                 </Box>
