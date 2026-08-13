@@ -1,13 +1,42 @@
 # Dependencies
 node_modules/
 
+# Build output
+dist/
+*.tsbuildinfo
+
 # Secrets
 .env
+.env.local
+.env.*.local
 openclaw.json
 
-# Secure Data
+# Legacy file-based state from the Telegram agent. Replaced by Postgres;
+# these paths must never be committed if an old checkout still has them.
 /users/
 rate_limits.json
+
+# Local infrastructure state
+infra/docker/backups/
+infra/terraform/.terraform/
+infra/terraform/*.tfstate
+infra/terraform/*.tfstate.*
+*.tfvars
+!*.tfvars.example
+
+# Mobile
+apps/mobile/.expo/
+apps/mobile/ios/
+apps/mobile/android/
+*.keystore
+*.p8
+*.p12
+*.mobileprovision
+
+# Test and tooling output
+coverage/
+.vitest/
+*.log
 
 # AI
 CLAUDE.md

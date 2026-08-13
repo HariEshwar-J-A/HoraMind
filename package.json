@@ -1,42 +1,47 @@
 {
     "name": "horamind",
-    "version": "1.0.0",
-    "description": "OpenClaw-powered Telegram AI Agent for astrology leveraging the node-jhora math engine and LLM routing logic.",
-    "main": "index.js",
+    "version": "2.0.0",
+    "private": true,
+    "description": "Vedic astrology backend and mobile app built on the node-jhora engine and the JyotishBase corpus.",
     "type": "module",
+    "workspaces": [
+        "apps/*",
+        "packages/*"
+    ],
     "scripts": {
-        "start": "bash ./start.sh",
-        "stop": "bash ./stop.sh",
-        "revoke": "bash ./stop.sh --revoke-only",
-        "users:sync": "node scripts/sync_users.js",
-        "users:add": "node scripts/add_user.js",
-        "users:list": "node tools/user_manager.js '{\"action\":\"list_users\",\"requesting_id\":\"ADMIN_ID\"}'",
-        "tools:test-user": "node tools/user_manager.js '{\"action\":\"session_start\",\"requesting_id\":\"123456789\"}'",
-        "tools:test-chart": "node tools/calculate_chart.js \"{\\\"date\\\":\\\"1996-12-07\\\",\\\"time\\\":\\\"10:34:00\\\",\\\"lat\\\":13.0878,\\\"lon\\\":80.2785,\\\"ayanamsa\\\":\\\"LAHIRI\\\",\\\"calculation_type\\\":\\\"CORE_CHARTS\\\",\\\"timezone\\\":\\\"Asia/Kolkata\\\"}\"",
-        "tools:test-rag": "node tools/query_bphs_rag.js \"Effects of Rahu in 9th house Vedic astrology\"",
-        "tools:test-rate": "node tools/check_rate_limit.js 123456789 --peek",
-        "test": "echo \"No automated tests yet. Use tools:test-* scripts to validate each tool.\" && exit 0"
+        "build": "npm run build --workspaces --if-present",
+        "dev": "npm run dev --workspace @horamind/api",
+        "start": "npm run start --workspace @horamind/api",
+        "lint": "eslint \"apps/*/src/**/*.ts\" \"packages/*/src/**/*.ts\"",
+        "typecheck": "tsc -b",
+        "test": "npm run test --workspaces --if-present",
+        "db:migrate": "node db/migrate.mjs",
+        "db:status": "node db/migrate.mjs --status",
+        "docker:up": "docker compose -f infra/docker/docker-compose.yml up -d",
+        "docker:down": "docker compose -f infra/docker/docker-compose.yml down",
+        "docker:logs": "docker compose -f infra/docker/docker-compose.yml logs -f api"
     },
     "keywords": [
-        "telegram",
-        "bot",
-        "ai-agent",
-        "openclaw",
+        "vedic-astrology",
+        "jyotish",
+        "astrology",
         "node-jhora",
         "jyotishbase",
-        "jyotish",
-        "vedic-astrology",
-        "astrology",
-        "rag"
+        "rag",
+        "fastify"
     ],
     "author": "Harieshwar Jagan Abirami <harieshwarja.official@gmail.com>",
     "license": "PolyForm-Noncommercial-1.0.0",
-    "dependencies": {
-        "@node-jhora/analytics": "^3.1.0",
-        "@node-jhora/core": "^3.1.0",
-        "@node-jhora/prediction": "^3.1.0",
-        "@xenova/transformers": "^2.17.2",
-        "chromadb": "^1.10.5",
-        "luxon": "^3.7.2"
+    "engines": {
+        "node": ">=22"
+    },
+    "devDependencies": {
+        "@eslint/js": "^9.39.5",
+        "@types/node": "^22.10.5",
+        "eslint": "^9.18.0",
+        "tsx": "^4.19.2",
+        "typescript": "^5.9.3",
+        "typescript-eslint": "^8.20.0",
+        "vitest": "^3.0.0"
     }
 }

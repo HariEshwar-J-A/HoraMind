@@ -1,0 +1,34 @@
+# Keep the build context small and secrets out of image layers.
+# A file copied in one stage and deleted in another is still in the history.
+
+node_modules
+**/node_modules
+**/dist
+**/.turbo
+
+.git
+.github
+.claude
+.vscode
+.idea
+
+.env
+.env.*
+!.env.example
+openclaw.json
+
+users/
+rate_limits.json
+*.log
+npm-debug.log*
+
+# Mounted at runtime, never baked in.
+infra/docker/backups
+**/chroma_data
+
+# Documentation and tests are not needed at runtime.
+**/*.md
+!README.md
+**/tests
+**/*.test.ts
+**/*.spec.ts
