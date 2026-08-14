@@ -5,6 +5,7 @@ import { Screen, Card, Txt, Box, Notice } from '../components/primitives.js';
 import { Reveal, Stagger, StaggerItem } from '../components/motion.js';
 import { DayStrip } from '../components/DayStrip.js';
 import LoadingState from '../components/bui/LoadingState.js';
+import { ErrorState, Accordion } from '@horamind/ui';
 import { api } from '../lib/api.js';
 import { brass, colors, fonts, radius, space } from '../theme/tokens.js';
 
@@ -326,13 +327,7 @@ export function Today() {
             {/* The full hora table, folded away. */}
             {open && open.horas.length > 0 && (
                 <Reveal delay={0.12}>
-                    <details>
-                        <summary style={{
-                            color: colors.textMuted, fontSize: 14, cursor: 'pointer',
-                            padding: space.md, listStyle: 'none',
-                        }}>
-                            Hour by hour — what each part of the day suits
-                        </summary>
+                    <Accordion title="Hour by hour — what each part of the day suits">
                         <Card style={{ marginTop: space.sm }}>
                             {open.horas.map((h, i) => (
                                 <Box key={i} style={{
@@ -362,21 +357,15 @@ export function Today() {
                                 </Box>
                             ))}
                         </Card>
-                    </details>
+                    </Accordion>
                 </Reveal>
             )}
 
             {/* The basis, for whichever day is open. */}
             {open && (
                 <Reveal delay={0.1}>
-                    <details>
-                        <summary style={{
-                            color: colors.textMuted, fontSize: 14, cursor: 'pointer',
-                            padding: space.md, listStyle: 'none',
-                        }}>
-                            Why — the factors behind this
-                        </summary>
-                        <Card style={{ marginTop: space.sm }}>
+                    <Accordion title="Why — the factors behind this">
+                        <Card>
                             <Row label="Tithi" value={open.tithi} />
                             <Row label="Nakshatra" value={open.nakshatra} />
                             <Row label="Yoga" value={open.yoga} />
@@ -388,20 +377,24 @@ export function Today() {
                                     <Txt style={{ fontSize: 12, color: colors.textMuted, marginBottom: space.xs }}>
                                         Slow-moving transits
                                     </Txt>
-                                    {open.transits.map((t, i) => (
+                                    {open.transits.map((tr, i) => (
                                         <Txt key={i} style={{ fontSize: 13, color: colors.textFaint, lineHeight: 20 }}>
-                                            {t}
+                                            {tr}
                                         </Txt>
                                     ))}
                                 </Box>
                             )}
                         </Card>
-                    </details>
+                    </Accordion>
                 </Reveal>
             )}
 
             {calendar.isError && !compass.data && (
-                <Notice tone="error">Could not load today. Try again shortly.</Notice>
+                <ErrorState
+                    title="Could not load today"
+                    hint="The calendar is computed, not generated — a retry is cheap."
+                    onRetry={() => { void calendar.refetch(); void compass.refetch(); }}
+                />
             )}
         </Screen>
     );

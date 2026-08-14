@@ -1,16 +1,20 @@
-import { useEffect, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import {
     BrowserRouter, Routes, Route, Navigate, NavLink, useLocation,
 } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { motion as m, useReducedMotion } from 'motion/react';
+import { Shell } from '@horamind/ui';
 
 import { ROUTES, TABS } from './routes/routes.js';
 import { useSession } from './lib/session.js';
 import { installPrefsStorage } from './lib/prefs.js';
+import { t } from './lib/i18n.js';
 import { Starfield } from './components/astro/Starfield.js';
+import { NotifyBell } from './components/notify/Bell.js';
 import { brass, colors, fonts, motion as mo, space, touchTarget } from './theme/tokens.js';
 
+import { Landing } from './screens/Landing.js';
 import { SignIn } from './screens/SignIn.js';
 import { Onboarding } from './screens/Onboarding.js';
 import { Today } from './screens/Today.js';
@@ -31,14 +35,12 @@ import { Devices } from './screens/Devices.js';
  */
 
 const SCREENS: Record<string, () => JSX.Element> = {
-    SignIn, Onboarding, Today, Chart, Ask, You, Life, EditProfile, Devices,
+    SignIn, Onboarding, Today, Chart, Ask, You, Life, EditProfile, Devices, Landing,
 };
 
 const queryClient = new QueryClient({
     defaultOptions: {
         queries: {
-            // Mobile networks drop requests routinely; one silent retry is worth
-            // more than an error state the user has to act on.
             retry: 1,
             refetchOnWindowFocus: false,
             staleTime: 60_000,
@@ -46,17 +48,33 @@ const queryClient = new QueryClient({
     },
 });
 
+const WIDE = '(min-width: 900px)';
+
+function useWide(): boolean {
+    const [wide, setWide] = useState(() => window.matchMedia(WIDE).matches);
+    useEffect(() => {
+        const mq = window.matchMedia(WIDE);
+        const on = () => setWide(mq.matches);
+        mq.addEventListener('change', on);
+        return () => mq.removeEventListener('change', on);
+    }, []);
+    return wide;
+}
+
 function Guard({ children, requiresAuth, requiresProfile }: {
     children: ReactNode; requiresAuth: boolean; requiresProfile?: boolean;
 }) {
     const { status, profile } = useSession();
     const location = useLocation();
 
-    // Never redirect before the session has been checked, or a reload bounces
-    // an authenticated user to sign-in for the moment it takes to restore.
     if (status === 'unknown') return <Splash />;
 
     if (requiresAuth && status !== 'authenticated') {
+        // `/` stays `requiresAuth` in the route table so the tab still
+        // authenticates, but an unauthenticated visit renders the landing
+        // rather than bouncing to sign-in. That is the whole reason a
+        // marketing page can exist at the same path as Today.
+        if (location.pathname === '/') return <Landing />;
         return <Navigate to="/sign-in" replace state={{ from: location.pathname }} />;
     }
     if (!requiresAuth && status === 'authenticated' && location.pathname === '/sign-in') {
@@ -69,14 +87,6 @@ function Guard({ children, requiresAuth, requiresProfile }: {
     return <>{children}</>;
 }
 
-/**
- * Shown while the session is being restored.
- *
- * It breathes rather than spinning. This appears for a few hundred
- * milliseconds on a warm start, and a spinner in that window reads as an error
- * state — something is *wrong* enough to need loading — where a slow pulse
- * reads as the app waking up.
- */
 function Splash() {
     const still = useReducedMotion();
 
@@ -94,21 +104,12 @@ function Splash() {
                     color: brass.mid, letterSpacing: 2,
                 }}
             >
-                HoraMind
+                {t('app.name')}
             </m.div>
         </div>
     );
 }
 
-/**
- * Which tab owns the current path.
- *
- * Longest prefix wins. `NavLink`'s own matching cannot express this: `to="/you"`
- * matches `/you/life` as a prefix, so both tabs light up, and adding `end` to
- * everything instead means `/you/devices` highlights nothing at all. Neither
- * default is right once tab routes nest inside each other, so the decision is
- * made here and handed to `NavLink` rather than inferred by it.
- */
 function activeTabPath(pathname: string): string | undefined {
     let best: string | undefined;
     for (const tab of TABS) {
@@ -120,35 +121,36 @@ function activeTabPath(pathname: string): string | undefined {
     return best;
 }
 
-function TabBar() {
-    const { status, profile } = useSession();
+function TabNav({ orientation }: { orientation: 'row' | 'column' }) {
     const { pathname } = useLocation();
     const active = activeTabPath(pathname);
-    if (status !== 'authenticated' || !profile) return null;
 
     return (
         <nav style={{
-            position: 'fixed', bottom: 0, left: 0, right: 0,
             display: 'flex',
-            backgroundColor: colors.surface,
-            borderTop: `1px solid ${colors.border}`,
-            // Clear of the iOS home indicator, which otherwise sits on the tabs.
-            paddingBottom: 'env(safe-area-inset-bottom)',
-            zIndex: 10,
+            flexDirection: orientation,
+            ...(orientation === 'row' ? {
+                position: 'fixed' as const, bottom: 0, left: 0, right: 0,
+                backgroundColor: colors.surface,
+                borderTop: `1px solid ${colors.border}`,
+                paddingBottom: 'env(safe-area-inset-bottom)',
+                zIndex: 10,
+            } : {
+                gap: 4,
+            }),
         }}>
             {TABS.map(tab => (
                 <NavLink
                     key={tab.path}
                     to={tab.path}
                     style={() => ({
-                        flex: 1,
-                        minHeight: touchTarget,
+                        ...(orientation === 'row'
+                            ? { flex: 1, minHeight: touchTarget, justifyContent: 'center', paddingTop: space.md, paddingBottom: space.md }
+                            : { minHeight: touchTarget, padding: '0 12px', borderRadius: 10, background: tab.path === active ? colors.surfaceRaised : 'transparent' }
+                        ),
                         display: 'flex',
                         alignItems: 'center',
-                        justifyContent: 'center',
                         position: 'relative',
-                        paddingTop: space.md,
-                        paddingBottom: space.md,
                         fontSize: 13,
                         fontWeight: tab.path === active ? 600 : 400,
                         color: tab.path === active ? colors.accent : colors.textMuted,
@@ -158,12 +160,7 @@ function TabBar() {
                 >
                     {() => (
                         <>
-                            {/* One indicator, shared across tabs by `layoutId`:
-                                Motion tweens it from the old tab's position to
-                                the new one instead of cross-fading two bars, so
-                                the mark travels and the movement names which
-                                direction you went. */}
-                            {tab.path === active && (
+                            {orientation === 'row' && tab.path === active && (
                                 <m.span
                                     layoutId="hm-tab-indicator"
                                     transition={{ type: 'spring', stiffness: 420, damping: 34 }}
@@ -184,25 +181,48 @@ function TabBar() {
     );
 }
 
-/**
- * The routed area, with a transition on arrival.
- *
- * Split out of `App` only because `useLocation` has to be called inside the
- * router.
- *
- * Entry only, and no `AnimatePresence`. That is not a shortcut — it is the one
- * arrangement that does not deadlock the router. `AnimatePresence` keeps the
- * *outgoing* subtree mounted for the length of its exit, so a second, stale
- * `<Routes>` stays live; the `Guard` inside it re-evaluates against the new
- * session, renders `<Navigate>` again, and the two trees push each other back
- * and forth until React gives up with "Maximum update depth exceeded". Any
- * route tree containing a declarative redirect has the same problem.
- *
- * Keying this wrapper on the path instead gives a clean remount: exactly one
- * live `<Routes>`, one redirect, and the incoming screen still animates. The
- * screens stagger their own contents in on top of it, which is where nearly all
- * of the movement is felt anyway.
- */
+function Chrome({ children }: { children: ReactNode }) {
+    const { status, profile } = useSession();
+    const wide = useWide();
+    if (status !== 'authenticated' || !profile) return <>{children}</>;
+
+    const header = (
+        <div style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            padding: `${space.sm}px ${space.lg}px`,
+        }}>
+            {wide ? <span /> : (
+                <span style={{
+                    fontFamily: fonts.display, fontSize: 18, color: brass.mid, letterSpacing: 1,
+                }}>
+                    {t('app.name')}
+                </span>
+            )}
+            <NotifyBell wide={wide} />
+        </div>
+    );
+
+    const brand = (
+        <div style={{
+            fontFamily: fonts.display, fontSize: 22, color: brass.mid,
+            letterSpacing: 1, padding: '8px 4px 16px',
+        }}>
+            {t('app.name')}
+        </div>
+    );
+
+    return (
+        <Shell
+            mode={wide ? 'sidebar' : 'tabs'}
+            brand={brand}
+            header={header}
+            nav={<TabNav orientation={wide ? 'column' : 'row'} />}
+        >
+            {children}
+        </Shell>
+    );
+}
+
 function RoutedScreens() {
     const location = useLocation();
     const still = useReducedMotion();
@@ -236,14 +256,6 @@ function RoutedScreens() {
     );
 }
 
-/*
- * The one place display preferences may touch the browser.
- *
- * `lib/prefs.ts` is forbidden from naming `localStorage` — the same lint rule
- * that keeps the rest of `lib/` portable — so the port is installed here, in
- * the shell, which is already DOM-aware. A React Native port swaps these four
- * lines for `AsyncStorage` and the store above never learns the difference.
- */
 installPrefsStorage({
     get: key => { try { return localStorage.getItem(key); } catch { return null; } },
     set: (key, value) => { try { localStorage.setItem(key, value); } catch { /* private mode */ } },
@@ -258,8 +270,9 @@ export function App() {
         <QueryClientProvider client={queryClient}>
             <Starfield />
             <BrowserRouter>
-                <RoutedScreens />
-                <TabBar />
+                <Chrome>
+                    <RoutedScreens />
+                </Chrome>
             </BrowserRouter>
         </QueryClientProvider>
     );

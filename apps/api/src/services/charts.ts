@@ -78,6 +78,52 @@ export function contextFor(profile: ProfileRow): ChartContext {
     };
 }
 
+/**
+ * A chart for a moment that is not a birth.
+ *
+ * Used by the unauthenticated landing page: the visitor's sky, right now, with
+ * the same engine and the same ayanamsa as a natal chart. Nothing is stored.
+ * The synthetic profile exists only because `natalChart` reads accuracy and
+ * settings off the row — fabricating one here is cheaper than a second
+ * code path that would drift.
+ */
+export function contextAt(opts: {
+    dt: DateTime;
+    latitude: number;
+    longitude: number;
+    timezone?: string;
+}): ChartContext {
+    const zone = opts.timezone ?? opts.dt.zoneName ?? 'UTC';
+    const synthetic: ProfileRow = {
+        id: '00000000-0000-0000-0000-000000000000',
+        userId: '00000000-0000-0000-0000-000000000000',
+        label: 'now',
+        isPrimary: true,
+        birthDate: opts.dt.toISODate() ?? '1970-01-01',
+        birthTime: opts.dt.toFormat('HH:mm:ss'),
+        timeAccuracy: 'exact',
+        placeName: 'here',
+        latitude: String(opts.latitude),
+        longitude: String(opts.longitude),
+        timezone: zone,
+        ayanamsa: 'true_chitra',
+        nodeType: 'true',
+        positionMode: 'geometric',
+        houseSystem: 'whole_sign',
+        dasamsaScheme: 'parashara',
+        horaScheme: 'parashara',
+        createdAt: new Date(0),
+        updatedAt: new Date(0),
+    };
+    return {
+        dt: opts.dt,
+        location: { latitude: opts.latitude, longitude: opts.longitude },
+        opts: { ayanamsaOrder: 27, nodeType: 'true', positionMode: 'geometric' },
+        houseSystem: 'whole_sign',
+        profile: synthetic,
+    };
+}
+
 export function natalChart(ctx: ChartContext) {
     const engine = getEngine();
     const planets = engine.getPlanets(ctx.dt, ctx.location, ctx.opts);

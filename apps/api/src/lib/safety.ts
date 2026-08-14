@@ -124,6 +124,18 @@ export const REFUSAL =
     + 'about the shape of the time rather than the outcome.';
 
 /**
+ * What the client actually receives.
+ *
+ * Screening and presentation used to live only in the route, so a test that
+ * the refusal reaches the user had to spin up Postgres, a session and a model.
+ * This is the one function that route calls; asserting it is asserting the
+ * contract.
+ */
+export function presentAnswer(answer: string): string {
+    return screenAnswer(answer).ok ? answer : REFUSAL;
+}
+
+/**
  * A per-user daily ceiling on model spend, in tokens.
  *
  * Distinct from the request quota, which counts *questions*. One user with a

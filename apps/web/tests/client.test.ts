@@ -174,6 +174,24 @@ describe('route table', () => {
     });
 });
 
+describe('i18n', () => {
+    test('returns the English string for a known key', async () => {
+        const { t } = await import('../src/lib/i18n.js');
+        expect(t('app.name')).toBe('iAstro');
+        expect(t('app.tagline')).toMatch(/No ads/);
+    });
+
+    test('returns the key itself when missing, so a forgotten string is visible', async () => {
+        const { t } = await import('../src/lib/i18n.js');
+        expect(t('not.a.real.key')).toBe('not.a.real.key');
+    });
+
+    test('formats degrees with a locale, never by concatenating a raw number', async () => {
+        const { formatDegree } = await import('../src/lib/i18n.js');
+        expect(formatDegree(12.5)).toMatch(/12\.50°/);
+    });
+});
+
 describe('session recovery', () => {
     afterEach(() => { vi.unstubAllGlobals(); });
 

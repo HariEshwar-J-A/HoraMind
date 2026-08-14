@@ -11,6 +11,17 @@
  * than an error.
  */
 
+/** User-facing product name. Package names stay `@horamind/*`. */
+export const APP_NAME = 'iAstro';
+
+/**
+ * The claim that is actually true.
+ *
+ * Superlatives ("the only free astrology app") are rejected by store review
+ * and trivially falsifiable. This sentence is backed by the README.
+ */
+export const APP_TAGLINE = 'Free. No ads. No data sale. Conversations deleted after 7 days.';
+
 export const TIERS = ['free', 'plus', 'pro'] as const;
 export type Tier = (typeof TIERS)[number];
 

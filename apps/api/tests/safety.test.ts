@@ -1,5 +1,5 @@
 import { describe, test, expect } from 'vitest';
-import { screenQuestion, screenAnswer, ceilingFor, REFUSAL } from '../src/lib/safety.js';
+import { screenQuestion, screenAnswer, presentAnswer, ceilingFor, REFUSAL } from '../src/lib/safety.js';
 
 /**
  * Guard rail tests.
@@ -81,6 +81,15 @@ describe('output screening', () => {
     test('the refusal explains itself and offers a way forward', () => {
         expect(REFUSAL).toMatch(/will not answer/i);
         expect(REFUSAL).toMatch(/try asking/i);
+    });
+
+    test('a refused answer reaches the client as the refusal, never the original text', () => {
+        const death = 'You will die in your sixty-third year.';
+        expect(presentAnswer(death)).toBe(REFUSAL);
+        expect(presentAnswer(death)).not.toContain('die');
+        expect(presentAnswer('Jupiter in the ninth favours study.')).toBe(
+            'Jupiter in the ninth favours study.',
+        );
     });
 });
 

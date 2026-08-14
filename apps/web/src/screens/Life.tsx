@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Screen, Card, Button, Txt, Notice } from '../components/primitives.js';
 import { Reveal, Stagger, StaggerItem } from '../components/motion.js';
 import LoadingState from '../components/bui/LoadingState.js';
+import { ErrorState } from '@horamind/ui';
 import { api, ApiError } from '../lib/api.js';
 import { brass, colors, fonts, space } from '../theme/tokens.js';
 
@@ -63,11 +64,11 @@ export function Life() {
             )}
 
             {generate.isError && (
-                <Notice tone="error">
-                    {generate.error instanceof ApiError
-                        ? generate.error.message
-                        : 'Could not write the reading.'}
-                </Notice>
+                <ErrorState
+                    title={generate.error instanceof ApiError ? generate.error.message : 'Could not write the reading.'}
+                    hint="Five completions; a retry spends them again."
+                    onRetry={() => generate.mutate()}
+                />
             )}
 
             {!has && !generate.isPending && (

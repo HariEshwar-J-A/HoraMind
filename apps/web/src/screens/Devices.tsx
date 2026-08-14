@@ -2,6 +2,7 @@ import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import type { SessionSummary } from '@horamind/shared';
 import { Screen, Card, Button, Txt, Box, Notice } from '../components/primitives.js';
+import { ErrorState } from '@horamind/ui';
 import { api } from '../lib/api.js';
 import { useSession } from '../lib/session.js';
 import { colors, space } from '../theme/tokens.js';
@@ -19,7 +20,7 @@ export function Devices() {
     const qc = useQueryClient();
     const { signOut } = useSession();
 
-    const { data, isLoading } = useQuery<{ sessions: SessionSummary[] }>({
+    const { data, isLoading, refetch, isError } = useQuery<{ sessions: SessionSummary[] }>({
         queryKey: ['sessions'], queryFn: () => api.get('/v1/sessions'),
     });
 
@@ -41,6 +42,14 @@ export function Devices() {
     });
 
     if (isLoading) return <Screen title="Devices"><Txt style={{ color: colors.textMuted }}>Loading…</Txt></Screen>;
+
+    if (isError || (!isLoading && !data)) {
+        return (
+            <Screen title="Signed-in devices">
+                <ErrorState title="Could not load devices" onRetry={() => void refetch()} />
+            </Screen>
+        );
+    }
 
     return (
         <Screen title="Signed-in devices">

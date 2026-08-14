@@ -9,6 +9,7 @@ import { ChartStyleToggle } from '../components/astro/ChartStyleToggle.js';
 import { NakshatraDial } from '../components/astro/NakshatraDial.js';
 import { graha } from '../components/astro/zodiac.js';
 import { PlanetBody } from '../components/astro/PlanetBody.js';
+import { ErrorState, Badge } from '@horamind/ui';
 import { api } from '../lib/api.js';
 import { usePrefs } from '../lib/prefs.js';
 import { brass, colors, fonts, space, radius } from '../theme/tokens.js';
@@ -38,7 +39,7 @@ interface NatalResponse {
 
 export function Chart() {
     const chartStyle = usePrefs(s => s.chartStyle);
-    const { data, isLoading, error } = useQuery<NatalResponse>({
+    const { data, isLoading, error, refetch } = useQuery<NatalResponse>({
         queryKey: ['natal'],
         queryFn: () => api.get('/v1/charts/natal'),
         // A birth chart is fixed for life. Refetching it is pointless.
@@ -63,7 +64,15 @@ export function Chart() {
     }
 
     if (error || !data) {
-        return <Screen title="Your chart"><Notice tone="error">Could not compute your chart.</Notice></Screen>;
+        return (
+            <Screen title="Your chart">
+                <ErrorState
+                    title="Could not compute your chart"
+                    hint="The ephemeris is local; a retry is almost always enough."
+                    onRetry={() => void refetch()}
+                />
+            </Screen>
+        );
     }
 
     const moon = data.planets.find(p => p.name === 'Moon');
@@ -144,11 +153,7 @@ export function Chart() {
                                             </Txt>
                                         </Box>
                                         {p.retrograde && (
-                                            <Txt as="span" style={{
-                                                fontSize: 11, color: colors.malefic,
-                                                borderWidth: 1, borderStyle: 'solid', borderColor: colors.malefic,
-                                                borderRadius: radius.sm, paddingLeft: 4, paddingRight: 4,
-                                            }}>R</Txt>
+                                            <Badge tone="bad" shape="square">R</Badge>
                                         )}
                                     </Box>
                                     <Box style={{ textAlign: 'right' }}>
