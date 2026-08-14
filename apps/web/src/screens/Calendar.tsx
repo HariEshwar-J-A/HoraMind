@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Screen, Card, Txt, Box, Notice } from '../components/primitives.js';
 import { Reveal, Stagger, StaggerItem } from '../components/motion.js';
+import { DayStrip } from '../components/DayStrip.js';
 import LoadingState from '../components/bui/LoadingState.js';
 import { api } from '../lib/api.js';
 import { brass, colors, fonts, radius, space } from '../theme/tokens.js';
@@ -33,9 +34,9 @@ const MARK_COLOR: Record<CalendarDay['mark'], string> = {
 };
 
 const MARK_LABEL: Record<CalendarDay['mark'], string> = {
-    tender: 'Saturn sits close to the Moon — expect friction, not disaster',
-    ordinary: 'Nothing dominant from Saturn today',
-    open: 'Saturn in an upachaya house — effort tends to compound',
+    tender: 'A rikta tithi — classically poor for starting something new',
+    ordinary: 'An ordinary tithi, with no particular reputation',
+    open: 'A purna tithi — classically a complete, favourable day',
 };
 
 /** "2026-08-13" without constructing a Date, which would shift it by a zone. */
@@ -80,16 +81,14 @@ export function Calendar() {
     return (
         <Screen title="Calendar">
             <Reveal>
-                <Box style={{
-                    display: 'flex', gap: space.xs, overflowX: 'auto',
-                    paddingBottom: space.sm, marginBottom: space.md,
-                }}>
+                <DayStrip activeKey={open.date}>
                     {data.days.map(d => {
                         const { weekday, day } = dayLabel(d.date);
                         const isOpen = d.date === open.date;
                         return (
                             <Box
                                 key={d.date}
+                                active={isOpen}
                                 onClick={() => setSelected(d.date)}
                                 style={{
                                     flex: '0 0 auto', width: 54,
@@ -121,7 +120,7 @@ export function Calendar() {
                             </Box>
                         );
                     })}
-                </Box>
+                </DayStrip>
             </Reveal>
 
             <Stagger>

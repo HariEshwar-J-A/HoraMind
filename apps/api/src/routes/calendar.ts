@@ -44,10 +44,16 @@ const Day = z.object({
     dasha: z.array(z.string()),
     transits: z.array(z.string()),
     /**
-     * A coarse mark for scanning a strip of days. Derived from Saturn's
-     * relationship to the Moon only — the one factor classical texts treat as
-     * dominant for a day's texture — and deliberately not a score. A number
-     * would imply a precision the computation does not have.
+     * A coarse mark for scanning a strip of days.
+     *
+     * Taken from the tithi's classical five-fold class, not from Saturn. Saturn
+     * was the obvious first choice and it was useless: it moves so slowly that
+     * every day in a fortnight carried an identical mark, and a signal that
+     * never varies is noise in the shape of information. The tithi class turns
+     * over daily and is a real classical judgement about a day.
+     *
+     * Deliberately three states rather than a score. A number would imply a
+     * precision this does not have.
      */
     mark: z.enum(['tender', 'ordinary', 'open']),
 });
@@ -102,15 +108,18 @@ export async function calendarRoutes(app: FastifyInstance): Promise<void> {
             const date = d.toISODate()!;
             const basis = computeBasis(profile, date, zone);
 
-            const houseFromMoon = basis.saturnCycle?.houseFromMoon ?? null;
-            // 1, 8 and 12 from the Moon are the classical hard placements for
-            // Saturn; 3, 6 and 11 are the upachaya houses where it is said to
-            // do well. Everything else is unremarkable, and saying so is more
-            // honest than manufacturing a gradient.
+            // The tithi arrives as "Shukla 2" or "Krishna 10"; the number is
+            // the classical index within the fortnight, and its position in the
+            // repeating five-fold cycle is what is being read here.
+            const tithiNumber = Number(basis.tithi.match(/(\d+)/)?.[1] ?? 0);
+            const cycle = tithiNumber > 0 ? ((tithiNumber - 1) % 5) + 1 : 0;
+
+            // Rikta (4th, 9th, 14th) are the "empty" tithis, classically poor
+            // for beginning anything. Purna (5th, 10th, 15th) are the complete
+            // ones. The remaining three carry no such reputation.
             const mark: 'tender' | 'ordinary' | 'open' =
-                houseFromMoon === null ? 'ordinary'
-                : [1, 8, 12].includes(houseFromMoon) ? 'tender'
-                : [3, 6, 11].includes(houseFromMoon) ? 'open'
+                cycle === 4 ? 'tender'
+                : cycle === 5 ? 'open'
                 : 'ordinary';
 
             days.push({

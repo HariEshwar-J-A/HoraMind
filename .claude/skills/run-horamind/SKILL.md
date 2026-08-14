@@ -117,13 +117,32 @@ runs — registration returning 409 is expected and handled.
 Env knobs: `HORAMIND_API`, `HORAMIND_WEB`, `HORAMIND_OUT`, `HORAMIND_CHROME`,
 `HORAMIND_CDP_PORT`.
 
+## Audit the UI
+
+```bash
+node .claude/skills/run-horamind/audit.mjs /tmp/hm-audit 390 844 9470
+```
+
+Signs in and walks every screen and section — sign-in, Today, Chart in both
+conventions, the dial, the planet table, Calendar, Ask, You and the life
+reading — writing a numbered PNG per stop at 2x device scale. Arguments are
+`<outDir> <width> <height> <cdpPort>`; run it twice, once at 390x844 and once at
+1280x900, since this app is mobile-first and the two disagree.
+
+It reports page height and horizontal overflow per shot, because overflow is
+the defect a screenshot *hides*: the page looks fine and the content is off the
+right edge. **Look at the images.** The three defects this caught last time —
+a day strip opening on the oldest day with today half-clipped, a visible
+scrollbar, and a per-day mark that was identical on all fifteen days — were all
+invisible to every assertion in the driver.
+
 ## Test
 
 ```bash
 set -a && . ./.env && set +a && export LC_ALL=C && npm test
 ```
 
-148 tests. The API integration suite needs Postgres up. Also:
+160 tests. The API integration suite needs Postgres up. Also:
 
 ```bash
 npm run typecheck

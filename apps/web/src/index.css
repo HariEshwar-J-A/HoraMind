@@ -64,3 +64,10 @@ details > summary::-webkit-details-marker {
         transition-duration: 0.01ms !important;
     }
 }
+
+/* WebKit draws a scrollbar the inline `scrollbar-width` property cannot reach,
+   and there is no way to target a pseudo-element from a style prop. Scoped to
+   the one component that opts in. */
+.hm-no-scrollbar::-webkit-scrollbar {
+    display: none;
+}
