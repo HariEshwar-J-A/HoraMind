@@ -38,6 +38,7 @@ export const ROUTES: RouteDef[] = [
     // a thumb can reach comfortably, and this is a screen someone opens
     // occasionally, not daily.
     { path: '/you/life', screen: 'Life', requiresAuth: true, requiresProfile: true, title: 'Your life' },
+    { path: '/you/details', screen: 'EditProfile', requiresAuth: true, requiresProfile: true, title: 'Your details' },
 
     { path: '/you/devices', screen: 'Devices', requiresAuth: true, title: 'Signed-in devices' },
 ];

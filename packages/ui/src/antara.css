@@ -1,0 +1,153 @@
+/*
+ * Antara — the parts of the design system that cannot be a component.
+ *
+ * "Antara" is the interval between two notes, and the gap between two houses in
+ * a chart. The system is named for the space between things because that is
+ * what most of it governs: rules, gaps, edges, and the scrollbar below.
+ *
+ * The direction is an *instrument*, not a dashboard. Three things at once:
+ * archaic in its references (an astrolabe: engraved hairlines, brass, a serif
+ * that predates the web), futuristic in its precision (sub-pixel rules, layered
+ * translucency, motion that obeys physics), and modern in its obligations
+ * (44px targets, 3:1 contrast on anything load-bearing, reduced-motion
+ * honoured everywhere).
+ *
+ * Only three things live here rather than in a component, and each because the
+ * platform gives no other way to reach them: the scrollbar pseudo-elements,
+ * the selection colour, and the focus ring.
+ */
+
+/* ---------------------------------------------------------------------------
+ * The scrollbar.
+ *
+ * Browsers draw a grey slab. On a night sky it reads as a seam in the page —
+ * and it is the one chrome element present on every screen, so leaving it
+ * default undoes the work everywhere else.
+ *
+ * This one is a *graduated rule*, the edge of a measuring instrument: a hairline
+ * track with faint tick marks, and a brass thumb that appears to slide along the
+ * scale. The ticks are a repeating gradient rather than elements, so they cost
+ * nothing and cannot desynchronise from the track.
+ *
+ * Firefox gets `scrollbar-color`, which is all it exposes. Not a fallback so
+ * much as the same idea at lower fidelity.
+ * ------------------------------------------------------------------------- */
+
+:root {
+    scrollbar-color: #8a6d18 transparent;
+    scrollbar-width: thin;
+}
+
+*::-webkit-scrollbar {
+    width: 11px;
+    height: 11px;
+}
+
+*::-webkit-scrollbar-track {
+    background:
+        /* the graduations */
+        repeating-linear-gradient(
+            to bottom,
+            rgba(58, 65, 96, 0.55) 0 1px,
+            transparent 1px 9px
+        ),
+        /* the rule itself */
+        linear-gradient(to bottom, transparent 0, rgba(42, 47, 69, 0.35) 12%, rgba(42, 47, 69, 0.35) 88%, transparent 100%);
+    background-clip: content-box;
+    border-left: 1px solid rgba(42, 47, 69, 0.6);
+}
+
+*::-webkit-scrollbar-thumb {
+    /* Brass, lit from the left like every other surface in the app. */
+    background:
+        linear-gradient(
+            to right,
+            #e8ce7a 0,
+            #c9a227 45%,
+            #8a6d18 100%
+        );
+    border: 2px solid transparent;
+    background-clip: content-box;
+    border-radius: 999px;
+    /* A hairline keeps the thumb from dissolving into a bright track. */
+    box-shadow: inset 0 0 0 0.5px rgba(11, 13, 23, 0.55);
+}
+
+*::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(to right, #f4e4a8 0, #dcb63a 45%, #a3811d 100%);
+    background-clip: content-box;
+}
+
+/* The corner where two scrollbars meet is drawn as a plain square by default,
+   which breaks the rule illusion at exactly the busiest point. */
+*::-webkit-scrollbar-corner {
+    background: transparent;
+}
+
+/* Opt-out for strips that are obviously swipeable and where a bar is noise. */
+.antara-plain-scroll {
+    scrollbar-width: none;
+}
+.antara-plain-scroll::-webkit-scrollbar {
+    display: none;
+}
+
+/* ---------------------------------------------------------------------------
+ * Selection and focus.
+ * ------------------------------------------------------------------------- */
+
+::selection {
+    background: rgba(201, 162, 39, 0.32);
+    color: #f0ece1;
+}
+
+/*
+ * `:focus-visible`, never `:focus`. A focus ring on every mouse click is the
+ * single most common reason people disable focus styling altogether, and then
+ * keyboard users lose it too.
+ *
+ * Two rings: a dark one inside, a brass one outside. On a palette this dark a
+ * single ring disappears against any raised surface.
+ */
+:where(a, button, input, textarea, select, [tabindex]):focus-visible {
+    outline: 2px solid #e8ce7a;
+    outline-offset: 2px;
+    border-radius: 4px;
+}
+
+/* ---------------------------------------------------------------------------
+ * Overflow, handled once.
+ *
+ * The failure this prevents: one long unbroken string — a pasted URL, a German
+ * compound, an email address — widening its container past the viewport and
+ * putting the *whole page* into horizontal scroll. It looks like a layout bug
+ * anywhere except where it is.
+ * ------------------------------------------------------------------------- */
+
+html, body {
+    overflow-x: clip;
+}
+
+.antara-prose {
+    overflow-wrap: anywhere;
+    hyphens: auto;
+}
+
+/* One line, then an ellipsis. */
+.antara-truncate {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
+}
+
+/*
+ * `min-width: 0` on flex children.
+ *
+ * A flex item's default `min-width: auto` refuses to shrink below its content,
+ * which is why truncation inside a flex row silently does nothing and the row
+ * overflows instead. This is the fix, and it is unguessable.
+ */
+.antara-row > * {
+    min-width: 0;
+}

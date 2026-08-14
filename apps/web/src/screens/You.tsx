@@ -144,6 +144,12 @@ export function You() {
                 </Txt>
                 <Button
                     variant="secondary"
+                    label="Edit your birth details"
+                    onPress={() => navigate('/you/details')}
+                    style={{ marginBottom: space.sm }}
+                />
+                <Button
+                    variant="secondary"
                     label="Your life — the long reading"
                     onPress={() => navigate('/you/life')}
                     style={{ marginBottom: space.sm }}
