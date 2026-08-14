@@ -53,18 +53,24 @@ interface House {
 }
 
 const HOUSES: ReadonlyArray<House> = [
-    { house: 1,  points: HOUSE_1_POINTS,             cx: 50, cy: 25, w: 28, h: 20 },
-    { house: 2,  points: '0,0 50,0 25,25',           cx: 25, cy: 9,  w: 28, h: 13 },
-    { house: 3,  points: '0,0 25,25 0,50',           cx: 9,  cy: 25, w: 13, h: 28 },
-    { house: 4,  points: '0,50 25,25 50,50 25,75',   cx: 25, cy: 50, w: 28, h: 20 },
-    { house: 5,  points: '0,50 25,75 0,100',         cx: 9,  cy: 75, w: 13, h: 28 },
-    { house: 6,  points: '0,100 25,75 50,100',       cx: 25, cy: 91, w: 28, h: 13 },
-    { house: 7,  points: '50,100 25,75 50,50 75,75', cx: 50, cy: 75, w: 28, h: 20 },
-    { house: 8,  points: '50,100 75,75 100,100',     cx: 75, cy: 91, w: 28, h: 13 },
-    { house: 9,  points: '100,100 75,75 100,50',     cx: 91, cy: 75, w: 13, h: 28 },
-    { house: 10, points: '100,50 75,75 50,50 75,25', cx: 75, cy: 50, w: 28, h: 20 },
-    { house: 11, points: '100,50 75,25 100,0',       cx: 91, cy: 25, w: 13, h: 28 },
-    { house: 12, points: '100,0 75,25 50,0',         cx: 75, cy: 9,  w: 28, h: 13 },
+    // Rhombi: |dx|/25 + |dy|/25 <= 1, so an inscribed rectangle needs
+    // w + h <= 50. 24 x 24 sits just inside that.
+    { house: 1,  points: HOUSE_1_POINTS,             cx: 50,   cy: 25,   w: 24, h: 24 },
+    // Triangles: base 50 wide, apex 25 deep. At depth y the half-width is
+    // 25 - y, so a box of height h resting on the base can only be
+    // 2(25 - h) wide. Area peaks at h = 12.5, giving 25 x 12.5 — which is
+    // why the old 28 x 13 poked through the diagonals at its far corners.
+    { house: 2,  points: '0,0 50,0 25,25',           cx: 25,   cy: 6.5,  w: 24, h: 12 },
+    { house: 3,  points: '0,0 25,25 0,50',           cx: 6.5,  cy: 25,   w: 12, h: 24 },
+    { house: 4,  points: '0,50 25,25 50,50 25,75',   cx: 25,   cy: 50,   w: 24, h: 24 },
+    { house: 5,  points: '0,50 25,75 0,100',         cx: 6.5,  cy: 75,   w: 12, h: 24 },
+    { house: 6,  points: '0,100 25,75 50,100',       cx: 25,   cy: 93.5, w: 24, h: 12 },
+    { house: 7,  points: '50,100 25,75 50,50 75,75', cx: 50,   cy: 75,   w: 24, h: 24 },
+    { house: 8,  points: '50,100 75,75 100,100',     cx: 75,   cy: 93.5, w: 24, h: 12 },
+    { house: 9,  points: '100,100 75,75 100,50',     cx: 93.5, cy: 75,   w: 12, h: 24 },
+    { house: 10, points: '100,50 75,75 50,50 75,25', cx: 75,   cy: 50,   w: 24, h: 24 },
+    { house: 11, points: '100,50 75,25 100,0',       cx: 93.5, cy: 25,   w: 12, h: 24 },
+    { house: 12, points: '100,0 75,25 50,0',         cx: 75,   cy: 6.5,  w: 24, h: 12 },
 ];
 
 /**
@@ -231,7 +237,14 @@ export function ChartWheel({ ascendantSign, planets, size = 560 }: {
                                 // of one sits under the middle rather than hard
                                 // against the left wall.
                                 const rowW = usedCols * fit.cellW;
-                                const x = cx - rowW / 2 + fit.cellW * (col + 0.5);
+                                // The body sits left of its cell's centre by
+                                // half the label's width: the pair is what has
+                                // to be centred, and centring the body alone
+                                // hangs the code off the right of every cell —
+                                // which at the right-hand houses means off the
+                                // chart.
+                                const cellMid = cx - rowW / 2 + fit.cellW * (col + 0.5);
+                                const x = cellMid - fit.r * 1.15;
                                 const y = gridTop + fit.cellH * row + fit.r * 1.45;
 
                                 return (
