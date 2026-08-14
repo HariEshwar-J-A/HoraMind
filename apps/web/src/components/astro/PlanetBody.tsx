@@ -53,7 +53,9 @@ export function bodyCode(name: string): string {
  * component serves a 400px chart and a 40px inline chip without a second
  * scale to keep in sync.
  */
-export function PlanetBody({ name, cx, cy, r = 4, retrograde = false, label = true, spin = true }: {
+export function PlanetBody({
+    name, cx, cy, r = 4, retrograde = false, label = true, spin = true, labelSide = 'below',
+}: {
     name: string;
     cx: number;
     cy: number;
@@ -62,6 +64,17 @@ export function PlanetBody({ name, cx, cy, r = 4, retrograde = false, label = tr
     label?: boolean;
     /** The slow axial turn. Off for static contexts like a legend. */
     spin?: boolean;
+    /**
+     * Where the two-letter code sits.
+     *
+     * `below` is the natural reading order and right for a legend or a lone
+     * planet. `right` exists for the chart: a code beneath the body makes each
+     * planet about five radii tall, and four of those stacked in a house like
+     * the ninth — a tall, narrow triangle — force the bodies down to something
+     * unreadable. Beside the body the cell is roughly half as tall, which is
+     * the difference between a legible chart and a crowded one.
+     */
+    labelSide?: 'below' | 'right';
 }) {
     const body = BODIES[name] ?? { code: name.slice(0, 2), palette: ['#DDD', '#999', '#555'] as [string, string, string] };
     const [lit, mid, dark] = body.palette;
@@ -136,8 +149,9 @@ export function PlanetBody({ name, cx, cy, r = 4, retrograde = false, label = tr
 
             {label && (
                 <text
-                    x={cx} y={cy + r * 2.55}
-                    textAnchor="middle"
+                    x={labelSide === 'right' ? cx + r * 1.5 : cx}
+                    y={labelSide === 'right' ? cy + r * 0.5 : cy + r * 2.55}
+                    textAnchor={labelSide === 'right' ? 'start' : 'middle'}
                     fill={lit}
                     style={{
                         fontSize: r * 1.35,

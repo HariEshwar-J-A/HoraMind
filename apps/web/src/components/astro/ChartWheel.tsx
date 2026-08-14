@@ -29,21 +29,80 @@ import { PlanetBody } from './PlanetBody.js';
  */
 const HOUSE_1_POINTS = '50,0 75,25 50,50 25,25';
 
-/** Corner of the outer square, edge midpoint, and centre. */
-const HOUSES: ReadonlyArray<{ house: number; points: string; cx: number; cy: number }> = [
-    { house: 1,  points: HOUSE_1_POINTS,              cx: 50,   cy: 26 },
-    { house: 2,  points: '0,0 50,0 25,25',            cx: 25,   cy: 11 },
-    { house: 3,  points: '0,0 25,25 0,50',            cx: 11,   cy: 25 },
-    { house: 4,  points: '0,50 25,25 50,50 25,75',    cx: 25,   cy: 51 },
-    { house: 5,  points: '0,50 25,75 0,100',          cx: 11,   cy: 75 },
-    { house: 6,  points: '0,100 25,75 50,100',        cx: 25,   cy: 89 },
-    { house: 7,  points: '50,100 25,75 50,50 75,75',  cx: 50,   cy: 76 },
-    { house: 8,  points: '50,100 75,75 100,100',      cx: 75,   cy: 89 },
-    { house: 9,  points: '100,100 75,75 100,50',      cx: 89,   cy: 75 },
-    { house: 10, points: '100,50 75,75 50,50 75,25',  cx: 75,   cy: 51 },
-    { house: 11, points: '100,50 75,25 100,0',        cx: 89,   cy: 25 },
-    { house: 12, points: '100,0 75,25 50,0',          cx: 75,   cy: 11 },
+/**
+ * Each house, with a box that is guaranteed to sit inside its polygon.
+ *
+ * The twelve regions are three different shapes — four rhombi in the middle of
+ * each edge, four wide triangles along the top and bottom, four tall ones up
+ * the sides — and they are nothing like the same size. Laying content out from
+ * the centroid with one set of offsets, which is what this did before, fits the
+ * rhombi and pushes glyphs straight through the walls of the triangles.
+ *
+ * So every house declares its own usable box instead. Nothing is positioned
+ * relative to a centroid any more; everything is positioned inside `w` x `h`
+ * centred on `cx, cy`, and a box that fits the polygon means its contents do
+ * too. The numbers are the largest axis-aligned rectangle that clears each
+ * shape's diagonals, rounded down.
+ */
+interface House {
+    house: number;
+    points: string;
+    cx: number; cy: number;
+    /** Usable interior, centred on cx/cy. */
+    w: number; h: number;
+}
+
+const HOUSES: ReadonlyArray<House> = [
+    { house: 1,  points: HOUSE_1_POINTS,             cx: 50, cy: 25, w: 28, h: 20 },
+    { house: 2,  points: '0,0 50,0 25,25',           cx: 25, cy: 9,  w: 28, h: 13 },
+    { house: 3,  points: '0,0 25,25 0,50',           cx: 9,  cy: 25, w: 13, h: 28 },
+    { house: 4,  points: '0,50 25,25 50,50 25,75',   cx: 25, cy: 50, w: 28, h: 20 },
+    { house: 5,  points: '0,50 25,75 0,100',         cx: 9,  cy: 75, w: 13, h: 28 },
+    { house: 6,  points: '0,100 25,75 50,100',       cx: 25, cy: 91, w: 28, h: 13 },
+    { house: 7,  points: '50,100 25,75 50,50 75,75', cx: 50, cy: 75, w: 28, h: 20 },
+    { house: 8,  points: '50,100 75,75 100,100',     cx: 75, cy: 91, w: 28, h: 13 },
+    { house: 9,  points: '100,100 75,75 100,50',     cx: 91, cy: 75, w: 13, h: 28 },
+    { house: 10, points: '100,50 75,75 50,50 75,25', cx: 75, cy: 50, w: 28, h: 20 },
+    { house: 11, points: '100,50 75,25 100,0',       cx: 91, cy: 25, w: 13, h: 28 },
+    { house: 12, points: '100,0 75,25 50,0',         cx: 75, cy: 9,  w: 28, h: 13 },
 ];
+
+/**
+ * Fit `n` grahas inside a box.
+ *
+ * Returns the grid and the body radius that makes them fit, shrinking rather
+ * than overflowing. A chart with a stellium is exactly when the diagram is most
+ * worth reading, so the answer to "too many for the space" has to be smaller
+ * planets, never planets outside the walls.
+ *
+ * A cell is 4.6r wide and 5.4r tall: the body is 2r across and the two-letter
+ * code below it is roughly 1.4r tall, plus breathing room on each side.
+ */
+function fitGrahas(n: number, w: number, h: number) {
+    const MAX_R = 2.8;
+    // A hard floor. Below this the bodies stop being distinguishable and the
+    // codes stop being readable, and a chart that is technically inside its
+    // walls but illegible has solved the wrong problem.
+    const MIN_R = 1.9;
+
+    for (let r = MAX_R; r >= MIN_R; r -= 0.05) {
+        // The code sits beside the body, not below it: 2r of body, a gap, and
+        // two monospace characters. That makes a cell wide and short rather
+        // than narrow and tall, which is the shape the crowded houses have.
+        const cellW = r * 5.2;
+        const cellH = r * 2.9;
+        const cols = Math.max(1, Math.floor(w / cellW));
+        const rows = Math.ceil(n / cols);
+        if (rows * cellH <= h) return { r, cols, cellW, cellH };
+    }
+
+    // Nine grahas in one house is astronomically possible and visually
+    // hopeless; at the floor size they are still inside the walls, which is
+    // the property that matters.
+    const r = MIN_R;
+    const cellW = r * 5.2;
+    return { r, cols: Math.max(1, Math.floor(w / cellW)), cellW, cellH: r * 2.9 };
+}
 
 /** The five strokes that make the frame, drawn in this order. */
 const FRAME: ReadonlyArray<string> = [
@@ -61,7 +120,7 @@ export interface WheelPlanet {
     retrograde: boolean;
 }
 
-export function ChartWheel({ ascendantSign, planets, size = 400 }: {
+export function ChartWheel({ ascendantSign, planets, size = 560 }: {
     /** 1–12, the rashi occupying house 1. */
     ascendantSign: number;
     planets: readonly WheelPlanet[];
@@ -87,7 +146,7 @@ export function ChartWheel({ ascendantSign, planets, size = 400 }: {
                 aria-label={`North Indian chart, ${rashi(ascendantSign).english} ascendant`}
                 initial="hidden"
                 animate="shown"
-                style={{ maxWidth: '100%', height: 'auto', overflow: 'visible' }}
+                style={{ width: '100%', maxWidth: size, height: 'auto', overflow: 'visible' }}
             >
                 <defs>
                     {/* Gold leaf: brighter at the top-left, as if lit from there. */}
@@ -132,12 +191,20 @@ export function ChartWheel({ ascendantSign, planets, size = 400 }: {
                     />
                 ))}
 
-                {HOUSES.map(({ house, cx, cy }, i) => {
+                {HOUSES.map(({ house, cx, cy, w, h }, i) => {
                     // House 1 holds the ascendant; the rest follow the zodiac
                     // in order around the fixed frame.
                     const sign = rashi(ascendantSign + house - 1);
                     const here = byHouse.get(house) ?? [];
                     const delay = 0.42 + i * 0.028;
+
+                    // The sign number is pinned to the top-left of the usable
+                    // box, and the grahas get whatever is left below it. Both
+                    // are inside the box, so both are inside the polygon.
+                    const numberH = 5;
+                    const fit = fitGrahas(Math.max(here.length, 1), w, h - numberH);
+                    const rows = Math.ceil(here.length / fit.cols);
+                    const gridTop = cy - h / 2 + numberH + (h - numberH - rows * fit.cellH) / 2;
 
                     return (
                         <m.g key={house}
@@ -146,30 +213,27 @@ export function ChartWheel({ ascendantSign, planets, size = 400 }: {
                                 shown: { opacity: 1, transition: { delay, duration: mo.base } },
                             }}
                         >
-                            {/* Sign number, engraved small and out of the way. */}
                             <text
-                                x={cx} y={cy - 8}
-                                textAnchor="middle"
+                                x={cx - w / 2} y={cy - h / 2 + 3.6}
+                                textAnchor="start"
                                 fill={brass.mid}
-                                opacity={0.75}
-                                style={{ fontSize: 4.2, fontFamily: fonts.mono, letterSpacing: 0.2 }}
+                                opacity={0.7}
+                                style={{ fontSize: 3.6, fontFamily: fonts.mono }}
                             >
                                 {sign.index}
                             </text>
 
                             {here.map((p, j) => {
-                                // Stack downwards from the centroid so a house
-                                // with four grahas stays inside its own region.
-                                // Four grahas in one house is common (a stellium
-                                // in Cancer here) and a single column runs off the
-                                // edge of the diagram. Past two, split into two
-                                // columns and tighten the rows.
-                                const twoCol = here.length > 2;
-                                const rows = twoCol ? Math.ceil(here.length / 2) : here.length;
-                                const col = twoCol ? j % 2 : 0;
-                                const row = twoCol ? Math.floor(j / 2) : j;
-                                const x = cx + (twoCol ? (col === 0 ? -5.5 : 5.5) : 0);
-                                const y = cy + row * 8.4 - (rows - 1) * 3.6;
+                                const col = j % fit.cols;
+                                const row = Math.floor(j / fit.cols);
+                                const usedCols = Math.min(fit.cols, here.length - row * fit.cols);
+                                // Centre each row's own cells, so a trailing row
+                                // of one sits under the middle rather than hard
+                                // against the left wall.
+                                const rowW = usedCols * fit.cellW;
+                                const x = cx - rowW / 2 + fit.cellW * (col + 0.5);
+                                const y = gridTop + fit.cellH * row + fit.r * 1.45;
+
                                 return (
                                     <m.g key={p.name}
                                         variants={{
@@ -187,8 +251,9 @@ export function ChartWheel({ ascendantSign, planets, size = 400 }: {
                                         <PlanetBody
                                             name={p.name}
                                             cx={x} cy={y}
-                                            r={2.2}
+                                            r={fit.r}
                                             retrograde={p.retrograde}
+                                            labelSide="right"
                                         />
                                     </m.g>
                                 );
