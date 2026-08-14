@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { DateTime } from 'luxon';
 
 import { getDb } from '../db/client.js';
+import { screenQuestion, screenAnswer, REFUSAL } from '../lib/safety.js';
 import { loadEnv } from '../config/env.js';
 import * as profiles from '../repos/profiles.js';
 import * as mem from '../repos/memories.js';
@@ -12,7 +13,7 @@ import * as users from '../repos/users.js';
 import { buildFacts } from '../services/facts.js';
 import { assemble } from '../services/prompt.js';
 import { interpret } from '../services/interpret.js';
-import { notFound } from '../lib/errors.js';
+import { notFound, badRequest } from '../lib/errors.js';
 
 /**
  * One-shot interpretation.
@@ -61,6 +62,14 @@ export async function interpretRoutes(app: FastifyInstance): Promise<void> {
 
     typed.post('/interpret', {
         onRequest: [app.authenticate],
+        /*
+         * A far tighter bucket than the global 300/min. Every call here runs
+         * one or more paid completions, so the global limit — sized for cheap
+         * reads like /health and /v1/charts — would allow a script to spend a
+         * month of credit in a minute. The daily quota bounds the total; this
+         * bounds the rate, which is what a runaway client actually hits.
+         */
+        config: { rateLimit: { max: 10, timeWindow: '1 minute' } },
         schema: {
             tags: ['ai'],
             description:
@@ -76,6 +85,19 @@ export async function interpretRoutes(app: FastifyInstance): Promise<void> {
 
         const user = await users.findUserById(sql, userId);
         if (!user) throw notFound('User');
+
+        // Screen the question before it is quoted into a prompt beside
+        // retrieved verses and stored memories. Refused before the quota is
+        // consumed: an attempt to talk to the model rather than ask it
+        // something should not also cost the user one of their questions.
+        const inbound = screenQuestion(req.body.question);
+        if (!inbound.ok) {
+            req.log.warn({ reasons: inbound.reasons }, 'question refused by input screen');
+            throw badRequest(
+                'That reads as an instruction to the assistant rather than a question '
+                + 'about your chart. Ask about a placement, a period or a decision instead.',
+            );
+        }
 
         const profile = req.body.profileId
             ? await profiles.findProfile(sql, userId, req.body.profileId)
@@ -123,8 +145,18 @@ export async function interpretRoutes(app: FastifyInstance): Promise<void> {
                 },
             });
 
+            // Screen the prose before anyone reads it. The rules are already in
+            // the system prompt, but a rule in a prompt is a request: a model
+            // that ignores it returns text indistinguishable from text that
+            // obeyed. This is the only thing between a confident sentence about
+            // someone's death and a user reading it.
+            const screened = screenAnswer(result.answer);
+            if (!screened.ok) {
+                req.log.warn({ reasons: screened.reasons }, 'interpretation refused by output screen');
+            }
+
             return reply.status(200).send({
-                answer: result.answer,
+                answer: screened.ok ? result.answer : REFUSAL,
                 citations: result.citations,
                 // Returned alongside the prose so a client can show the reasoning
                 // the answer rests on rather than asking to be believed.

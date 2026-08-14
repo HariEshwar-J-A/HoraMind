@@ -1,8 +1,12 @@
 import { useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import { Screen, Card, Button, Txt, Box, Notice } from '../components/primitives.js';
+import { Stagger, StaggerItem } from '../components/motion.js';
+import { StreamingText } from '../components/ai.js';
+import LoadingState from '../components/bui/LoadingState.js';
+import { graha, natureColor } from '../components/astro/zodiac.js';
 import { api, ApiError } from '../lib/api.js';
-import { colors, space, radius, touchTarget } from '../theme/tokens.js';
+import { colors, fonts, space, radius, touchTarget } from '../theme/tokens.js';
 
 /**
  * Ask a question.
@@ -73,18 +77,36 @@ export function Ask() {
                 />
             </Card>
 
+            {ask.isPending && (
+                <Card>
+                    {/* Beautiful UI's loader. The elapsed timer is the honest
+                        part: an interpretation takes real seconds, and a bare
+                        spinner gives no sense of whether it is five or fifty. */}
+                    <LoadingState label="Reading your chart" variant="Orbit" />
+                </Card>
+            )}
+
             {error && <Notice tone="error">{error}</Notice>}
 
             {result && (
-                <>
-                    <Card>
-                        {result.answer.split('\n').filter(Boolean).map((para, i) => (
-                            <Txt key={i} style={{ fontSize: 16, lineHeight: 25, marginBottom: space.md }}>
-                                {para}
-                            </Txt>
-                        ))}
-                    </Card>
+                <Stagger>
+                    <StaggerItem>
+                        <Card>
+                            {/* Only the first paragraph is revealed a few words
+                                at a time — enough to signal the answer is
+                                arriving, without making someone wait to read
+                                the rest of what the server already sent. */}
+                            {result.answer.split('\n').filter(Boolean).map((para, i) => (
+                                <Box key={i} style={{ marginBottom: space.md }}>
+                                    {i === 0
+                                        ? <StreamingText text={para} />
+                                        : <Txt style={{ fontSize: 16, lineHeight: 25 }}>{para}</Txt>}
+                                </Box>
+                            ))}
+                        </Card>
+                    </StaggerItem>
 
+                    <StaggerItem>
                     <Card>
                         <Txt style={{
                             fontSize: 12, fontWeight: '600', color: colors.textMuted,
@@ -97,9 +119,18 @@ export function Ask() {
                                 display: 'flex', justifyContent: 'space-between',
                                 alignItems: 'center', paddingTop: space.sm, paddingBottom: space.sm,
                             }}>
-                                <Box>
-                                    <Txt style={{ fontSize: 14 }}>{d.lord}</Txt>
-                                    <Txt style={{ fontSize: 12, color: colors.textFaint }}>{d.levelName}</Txt>
+                                <Box style={{ display: 'flex', alignItems: 'center', gap: space.md }}>
+                                    <Txt as="span" style={{
+                                        fontSize: 18, fontFamily: fonts.display,
+                                        color: natureColor(graha(d.lord).nature),
+                                        width: 22, textAlign: 'center',
+                                    }}>
+                                        {graha(d.lord).glyph}
+                                    </Txt>
+                                    <Box>
+                                        <Txt style={{ fontSize: 14 }}>{d.lord}</Txt>
+                                        <Txt style={{ fontSize: 12, color: colors.textFaint }}>{d.levelName}</Txt>
+                                    </Box>
                                 </Box>
                                 {d.classicalBranch && (
                                     <Txt style={{
@@ -118,30 +149,38 @@ export function Ask() {
                             </Box>
                         ))}
                     </Card>
+                    </StaggerItem>
 
                     {result.citations.length > 0 && (
-                        <Card>
-                            <Txt style={{
-                                fontSize: 12, fontWeight: '600', color: colors.textMuted,
-                                textTransform: 'uppercase', letterSpacing: 1, marginBottom: space.md,
-                            }}>
-                                Sources consulted
-                            </Txt>
-                            {result.citations.map((c, i) => (
-                                <Txt key={i} style={{ fontSize: 13, color: colors.textFaint, lineHeight: 20 }}>
-                                    {[c.source ?? 'BPHS',
-                                      c.chapter ? `Chapter ${c.chapter}` : null,
-                                      c.verse ? `verse ${c.verse}` : null,
-                                    ].filter(Boolean).join(' · ')}
+                        <StaggerItem>
+                            <Card>
+                                <Txt style={{
+                                    fontSize: 12, fontWeight: '600', color: colors.textMuted,
+                                    textTransform: 'uppercase', letterSpacing: 1, marginBottom: space.md,
+                                }}>
+                                    Sources consulted
                                 </Txt>
-                            ))}
-                        </Card>
+                                {result.citations.map((c, i) => (
+                                    <Txt key={i} style={{ fontSize: 13, color: colors.textFaint, lineHeight: 20 }}>
+                                        {[c.source ?? 'BPHS',
+                                          c.chapter ? `Chapter ${c.chapter}` : null,
+                                          c.verse ? `verse ${c.verse}` : null,
+                                        ].filter(Boolean).join(' · ')}
+                                    </Txt>
+                                ))}
+                            </Card>
+                        </StaggerItem>
                     )}
 
-                    <Txt style={{ fontSize: 12, color: colors.textFaint, textAlign: 'center' }}>
-                        {result.quota.remaining} of {result.quota.limit} questions left today
-                    </Txt>
-                </>
+                    <StaggerItem>
+                        <Txt style={{
+                            fontSize: 12, color: colors.textFaint, textAlign: 'center',
+                            fontFamily: fonts.mono,
+                        }}>
+                            {result.quota.remaining} of {result.quota.limit} questions left today
+                        </Txt>
+                    </StaggerItem>
+                </Stagger>
             )}
         </Screen>
     );

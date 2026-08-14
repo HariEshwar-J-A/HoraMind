@@ -28,10 +28,31 @@ export const ROUTES: RouteDef[] = [
     { path: '/sign-in',   screen: 'SignIn',    requiresAuth: false, title: 'Sign in' },
     { path: '/onboarding', screen: 'Onboarding', requiresAuth: true, title: 'Your birth details' },
 
+    /*
+     * Tabs are named for what someone came to do, not for what the screen
+     * contains. "Calendar" describes a widget; "Today" describes an intention,
+     * and it is the reason the app is open.
+     *
+     * Today and the day strip are one destination now. They were two tabs
+     * answering the same question — what is going on today — and splitting them
+     * meant the reading lived in one place and the day it referred to lived in
+     * another.
+     */
     { path: '/',        screen: 'Today',    tabLabel: 'Today',   requiresAuth: true, requiresProfile: true, title: 'Today' },
     { path: '/chart',   screen: 'Chart',    tabLabel: 'Chart',   requiresAuth: true, requiresProfile: true, title: 'Your chart' },
     { path: '/ask',     screen: 'Ask',      tabLabel: 'Ask',     requiresAuth: true, requiresProfile: true, title: 'Ask' },
-    { path: '/you',     screen: 'You',      tabLabel: 'You',     requiresAuth: true, requiresProfile: true, title: 'You' },
+    { path: '/you/life', screen: 'Life',    tabLabel: 'Life',    requiresAuth: true, requiresProfile: true, title: 'Your life' },
+    { path: '/you',     screen: 'You',      tabLabel: 'Me',      requiresAuth: true, requiresProfile: true, title: 'You' },
+
+    // Today absorbed the calendar, so /calendar renders Today rather than a
+    // second screen showing the same fortnight. Kept as a route because an old
+    // link should land somewhere real, not on a redirect to the root.
+    { path: '/calendar', screen: 'Today', requiresAuth: true, requiresProfile: true, title: 'Today' },
+
+    // Reachable from You rather than the tab bar: five tabs is already the most
+    // a thumb can reach comfortably, and this is a screen someone opens
+    // occasionally, not daily.
+    { path: '/you/details', screen: 'EditProfile', requiresAuth: true, requiresProfile: true, title: 'Your details' },
 
     { path: '/you/devices', screen: 'Devices', requiresAuth: true, title: 'Signed-in devices' },
 ];

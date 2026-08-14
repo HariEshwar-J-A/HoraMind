@@ -6,7 +6,7 @@ import { Ashtakavarga } from '@node-jhora/analytics';
 import { generateVimshottari } from '@node-jhora/prediction';
 
 import { getEngine } from '../lib/engine.js';
-import type { ProfileRow } from '../repos/profiles.js';
+import { toCalendarDate, type ProfileRow } from '../repos/profiles.js';
 import { badRequest } from '../lib/errors.js';
 
 /**
@@ -52,7 +52,7 @@ export interface ChartContext {
  */
 export function contextFor(profile: ProfileRow): ChartContext {
     const dt = DateTime.fromISO(
-        `${String(profile.birthDate).slice(0, 10)}T${profile.birthTime}`,
+        `${toCalendarDate(profile.birthDate)}T${profile.birthTime}`,
         { zone: profile.timezone },
     );
 

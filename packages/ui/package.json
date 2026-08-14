@@ -1,0 +1,11 @@
+{
+    "name": "@horamind/ui",
+    "version": "1.0.0",
+    "private": true,
+    "type": "module",
+    "description": "Antara — HoraMind's design system. An engineered instrument, not a dashboard.",
+    "main": "./src/index.tsx",
+    "exports": { ".": "./src/index.tsx", "./styles.css": "./src/antara.css" },
+    "scripts": { "lint": "eslint src" },
+    "peerDependencies": { "react": "^18.3.1", "motion": "^13.0.0" }
+}

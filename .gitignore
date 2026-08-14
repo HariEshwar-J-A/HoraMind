@@ -40,7 +40,12 @@ coverage/
 
 # AI
 CLAUDE.md
-.claude/
+# Local Claude state stays private; the committed run skill does not — it is
+# shared tooling, and a driver nobody else can check out is not much of a
+# driver. A bare `!.claude/skills/` would not work: git does not descend into
+# an excluded directory, so the parent has to be `.claude/*`.
+.claude/*
+!.claude/skills/
 
 # Cloudflare Tunnel — instance-specific, contains a UUID and credentials
 infra/docker/cloudflared/config.yml

@@ -1,0 +1,150 @@
+/*
+ * Beautiful UI's token contract, in HoraMind's colours.
+ *
+ * The components vendored into `components/bui/` are taken from
+ * beautifului.dev unmodified. They never name a colour: every one is written
+ * against semantic tokens — `text-ink`, `bg-surface`, `border-line`,
+ * `shadow-card`. That is what makes this file possible. Redefining the tokens
+ * re-themes all nineteen components at once, and not one of them has to be
+ * edited or forked to follow.
+ *
+ * Beautiful UI ships light: a white surface, near-black ink, a blue accent,
+ * built for data-dense agent consoles. HoraMind is read in the evening about a
+ * night sky, and `theme/tokens.ts` says so. So the *structure* is theirs and
+ * the *palette* is ours — an inversion rather than a tint, because a dark theme
+ * derived by dimming a light one always looks like a light one with the lights
+ * off.
+ *
+ * Two rules for anything added here:
+ *   - Ink is never pure white. #FFF on a dark ground haloes and tires the eye;
+ *     the parchment cast below also reads warmer against brass.
+ *   - Elevation is carried by a hairline ring, not a drop shadow. Shadows are
+ *     nearly invisible on a near-black ground, so the light system's
+ *     `0 1px 2px` would silently flatten every card into the background.
+ */
+
+@import 'tailwindcss';
+
+/*
+ * Several vendored components carry `dark:` variants for their own dark mode.
+ * This app has no light mode — `index.css` pins `color-scheme: dark` — so the
+ * variant is made unconditional. Left as Tailwind's default it would follow the
+ * *operating system*, and the components would render their light branch on a
+ * machine set to light while everything around them stayed a night sky.
+ */
+@custom-variant dark (&:where(:root, :root *));
+
+@theme {
+    /* ---------------------------------------------------------------------
+     * Surfaces — night sky, deepest at the page and rising toward the fore.
+     * ------------------------------------------------------------------- */
+    --color-page: #0b0d17;
+    --color-canvas: #0e1120;
+    --color-surface: #151827;
+    --color-inset: #11142280;
+    --color-hover: #1e2235;
+    --color-hover-2: #262b40;
+    --color-field: #0f1222;
+
+    /* ---------------------------------------------------------------------
+     * Ink — warm parchment, three weights.
+     * ------------------------------------------------------------------- */
+    --color-ink: #f0ece1;
+    --color-ink-2: #a8acc2;
+    --color-ink-3: #767c99;
+
+    /* Engraved rules. */
+    --color-line: #2a2f45;
+    --color-line-strong: #3a4160;
+
+    /* ---------------------------------------------------------------------
+     * Accent — brass. The app's one warm colour, and the only thing besides
+     * a graha that is allowed to be gold.
+     * ------------------------------------------------------------------- */
+    --color-accent: #c9a227;
+    --color-accent-ink: #e8ce7a;
+    --color-accent-tint: #2a2412;
+
+    /* ---------------------------------------------------------------------
+     * Status — carried over from the chart palette so a benefic graha and a
+     * favourable day are the same green. Two greens meaning "good" in one app
+     * is a tell that the design grew rather than was decided.
+     * ------------------------------------------------------------------- */
+    --color-green: #5bc98c;
+    --color-green-tint: #14291e;
+    --color-orange: #e2915b;      /* saffron */
+    --color-orange-tint: #2b1f12;
+    --color-red: #e2725b;         /* kumkum */
+    --color-red-tint: #2b1616;
+
+    /* Zebra striping, barely there. */
+    --color-stripe: #ffffff08;
+    --color-stripe-bg: #12152280;
+
+    /* Tooltips invert: a light chip on a dark page reads as "on top of". */
+    --color-tooltip-bg: #f0ece1;
+    --color-tooltip-fg: #14172a;
+    --color-tooltip-muted: #5a5f7a;
+    --color-tooltip-border: #cdc7b6;
+
+    --radius-control: 8px;
+    --radius-card: 14px;
+
+    /* Rings, not shadows — see the note at the top. */
+    --shadow-hairline: 0 0 0 1px var(--color-line);
+    --shadow-btn: 0 0 0 1px var(--color-line-strong), 0 1px 2px #00000059;
+    --shadow-card: 0 0 0 1px var(--color-line), 0 2px 8px #00000040;
+    --shadow-raised: 0 0 0 1px var(--color-line-strong), 0 4px 16px #0006;
+    --shadow-overlay: 0 0 0 1px var(--color-line-strong), 0 16px 48px #0009;
+    --shadow-inset-field: inset 0 1px 2px #0000006b;
+}
+
+/*
+ * The components reference these by name in inline `animation:` shorthands, so
+ * they have to exist globally rather than as Tailwind utilities. Copied from
+ * beautifului.dev so the vendored components animate exactly as published.
+ */
+@keyframes shimmer-text {
+    0%   { background-position: 150% center; }
+    100% { background-position: -50% center; }
+}
+
+@keyframes fade-up {
+    0%   { opacity: 0; transform: translateY(8px); }
+    100% { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fade-in {
+    0%   { opacity: 0; }
+    100% { opacity: 1; }
+}
+
+@keyframes eq-bounce {
+    0%, 100% { transform: scaleY(0.35); }
+    50%      { transform: scaleY(1); }
+}
+
+@keyframes stream-in {
+    0%   { opacity: 0; filter: blur(4px); }
+    100% { opacity: 1; filter: blur(0); }
+}
+
+@keyframes caret-blink {
+    0%, 100% { opacity: 1; }
+    50%      { opacity: 0; }
+}
+
+@keyframes pop-in {
+    0%   { opacity: 0; transform: scale(0.95); }
+    100% { opacity: 1; transform: scale(1); }
+}
+
+@keyframes spin {
+    100% { transform: rotate(1turn); }
+}
+
+@keyframes pixel-on {
+    0%, 100% { opacity: 0.15; }
+    18%, 42% { opacity: 1; }
+    62%      { opacity: 0.15; }
+}

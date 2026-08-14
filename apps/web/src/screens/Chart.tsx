@@ -1,16 +1,27 @@
 import { useQuery } from '@tanstack/react-query';
 import { Screen, Card, Txt, Box, Notice } from '../components/primitives.js';
+import { Reveal, Stagger, StaggerItem } from '../components/motion.js';
+import { Shimmer } from '../components/ai.js';
+import LoadingState from '../components/bui/LoadingState.js';
+import { ChartWheel } from '../components/astro/ChartWheel.js';
+import { SouthChart } from '../components/astro/SouthChart.js';
+import { ChartStyleToggle } from '../components/astro/ChartStyleToggle.js';
+import { NakshatraDial } from '../components/astro/NakshatraDial.js';
+import { graha } from '../components/astro/zodiac.js';
+import { PlanetBody } from '../components/astro/PlanetBody.js';
 import { api } from '../lib/api.js';
-import { colors, space, radius } from '../theme/tokens.js';
+import { usePrefs } from '../lib/prefs.js';
+import { brass, colors, fonts, space, radius } from '../theme/tokens.js';
 
 /**
  * The natal chart.
  *
- * Rendered as a table rather than a diagram for now. A North or South Indian
- * square chart is the recognisable form and belongs here, but it is a real
- * piece of SVG work — and a legible table of placements is more useful than a
- * half-drawn diagram. When it arrives it should use `react-native-svg`
- * primitives so the geometry survives a native port.
+ * The diagram the earlier version of this file asked for now exists: a North
+ * Indian square in `components/astro/ChartWheel`, built from `react-native-svg`
+ * -compatible primitives so the geometry survives a native port. The table
+ * stays underneath it — the square is the recognisable form, but it cannot show
+ * a degree, and a degree is what distinguishes a planet at the start of a sign
+ * from one about to leave it.
  */
 
 interface NatalResponse {
@@ -18,12 +29,15 @@ interface NatalResponse {
     houseAccuracy: 'exact' | 'approximate' | 'unknown';
     planets: Array<{
         name: string; signName: string; degree: number;
+        /** Sidereal longitude from 0° Aries — what the nakshatra dial needs. */
+        longitude: number;
         house: number; retrograde: boolean;
     }>;
     meta: { ayanamsa: string; ayanamsaValue: number; engine: string };
 }
 
 export function Chart() {
+    const chartStyle = usePrefs(s => s.chartStyle);
     const { data, isLoading, error } = useQuery<NatalResponse>({
         queryKey: ['natal'],
         queryFn: () => api.get('/v1/charts/natal'),
@@ -31,10 +45,28 @@ export function Chart() {
         staleTime: Infinity,
     });
 
-    if (isLoading) return <Screen title="Your chart"><Txt style={{ color: colors.textMuted }}>Computing…</Txt></Screen>;
+    if (isLoading) {
+        return (
+            <Screen title="Your chart">
+                {/* Shaped like the answer: a square, then rows. Skeletons that
+                    match the eventual layout stop the page jumping when it
+                    arrives. */}
+                <Box style={{ marginBottom: space.lg }}>
+                    <LoadingState label="Computing your chart" variant="Orbit" />
+                </Box>
+                <Box style={{ display: 'flex', justifyContent: 'center', marginBottom: space.lg }}>
+                    <Shimmer height={300} width={300} radius={radius.lg} />
+                </Box>
+                {[0, 1, 2, 3, 4].map(i => <Shimmer key={i} height={44} />)}
+            </Screen>
+        );
+    }
+
     if (error || !data) {
         return <Screen title="Your chart"><Notice tone="error">Could not compute your chart.</Notice></Screen>;
     }
+
+    const moon = data.planets.find(p => p.name === 'Moon');
 
     return (
         <Screen title="Your chart">
@@ -45,44 +77,102 @@ export function Chart() {
                 </Notice>
             )}
 
-            <Card>
-                <Txt style={{ fontSize: 12, color: colors.textMuted, marginBottom: space.xs }}>Ascendant</Txt>
-                <Txt style={{ fontSize: 24, fontWeight: '600' }}>
-                    {data.ascendant.signName} {data.ascendant.degree.toFixed(2)}&deg;
-                </Txt>
-            </Card>
+            <ChartStyleToggle />
 
-            <Card>
-                {data.planets.map(p => (
-                    <Box key={p.name} style={{
-                        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                        paddingTop: space.md, paddingBottom: space.md,
-                        borderBottomWidth: 1, borderBottomStyle: 'solid', borderBottomColor: colors.border,
+            {chartStyle === 'north' ? (
+                <ChartWheel ascendantSign={data.ascendant.sign} planets={data.planets} />
+            ) : (
+                <SouthChart ascendantSign={data.ascendant.sign} planets={data.planets} />
+            )}
+
+            <Reveal delay={0.55}>
+                <Card style={{ textAlign: 'center' }}>
+                    <Txt style={{
+                        fontSize: 12, color: colors.textMuted, letterSpacing: 1,
+                        fontFamily: fonts.mono, marginBottom: space.xs,
                     }}>
-                        <Box style={{ display: 'flex', alignItems: 'center', gap: space.sm }}>
-                            <Txt style={{ fontSize: 16, fontWeight: '500' }}>{p.name}</Txt>
-                            {p.retrograde && (
-                                <Txt as="span" style={{
-                                    fontSize: 11, color: colors.malefic,
-                                    borderWidth: 1, borderStyle: 'solid', borderColor: colors.malefic,
-                                    borderRadius: radius.sm, paddingLeft: 4, paddingRight: 4,
-                                }}>R</Txt>
-                            )}
-                        </Box>
-                        <Box style={{ textAlign: 'right' }}>
-                            <Txt style={{ fontSize: 14 }}>
-                                {p.signName} {p.degree.toFixed(2)}&deg;
-                            </Txt>
-                            <Txt style={{ fontSize: 12, color: colors.textFaint }}>House {p.house}</Txt>
-                        </Box>
-                    </Box>
-                ))}
-            </Card>
+                        ASCENDANT
+                    </Txt>
+                    <Txt style={{ fontSize: 26, fontWeight: '600', fontFamily: fonts.display, color: brass.light }}>
+                        {data.ascendant.signName} {data.ascendant.degree.toFixed(2)}&deg;
+                    </Txt>
+                </Card>
+            </Reveal>
 
-            <Txt style={{ fontSize: 11, color: colors.textFaint, textAlign: 'center', lineHeight: 18 }}>
-                {data.meta.engine} · {data.meta.ayanamsa} ayanamsa
-                ({data.meta.ayanamsaValue.toFixed(4)}&deg;)
-            </Txt>
+            {moon && (
+                <Reveal delay={0.7}>
+                    <Card>
+                        <Txt style={{
+                            fontSize: 12, color: colors.textMuted, letterSpacing: 1,
+                            fontFamily: fonts.mono, marginBottom: space.md, textAlign: 'center',
+                        }}>
+                            MOON&rsquo;S NAKSHATRA
+                        </Txt>
+                        <NakshatraDial moonLongitude={moon.longitude} />
+                        <Txt style={{
+                            fontSize: 12, color: colors.textFaint, textAlign: 'center',
+                            marginTop: space.sm, lineHeight: 18,
+                        }}>
+                            This arc fixes your Vimshottari dasha sequence.
+                        </Txt>
+                    </Card>
+                </Reveal>
+            )}
+
+            <Stagger delay={0.85}>
+                <Card>
+                    {data.planets.map(p => {
+                        const g = graha(p.name);
+                        return (
+                            <StaggerItem key={p.name}>
+                                <Box style={{
+                                    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                                    paddingTop: space.md, paddingBottom: space.md,
+                                    borderBottomWidth: 1, borderBottomStyle: 'solid', borderBottomColor: colors.border,
+                                }}>
+                                    <Box style={{ display: 'flex', alignItems: 'center', gap: space.md }}>
+                                        {/* The same rendered body as the chart, so
+                                            a row and a cell are recognisably the
+                                            same planet. */}
+                                        <svg width={30} height={30} viewBox="0 0 20 20" aria-hidden="true">
+                                            <PlanetBody name={p.name} cx={10} cy={8} r={5} label={false} spin={false} />
+                                        </svg>
+                                        <Box>
+                                            <Txt style={{ fontSize: 16, fontWeight: '500' }}>{p.name}</Txt>
+                                            <Txt style={{ fontSize: 11, color: colors.textFaint, fontFamily: fonts.display }}>
+                                                {g.sanskrit}
+                                            </Txt>
+                                        </Box>
+                                        {p.retrograde && (
+                                            <Txt as="span" style={{
+                                                fontSize: 11, color: colors.malefic,
+                                                borderWidth: 1, borderStyle: 'solid', borderColor: colors.malefic,
+                                                borderRadius: radius.sm, paddingLeft: 4, paddingRight: 4,
+                                            }}>R</Txt>
+                                        )}
+                                    </Box>
+                                    <Box style={{ textAlign: 'right' }}>
+                                        <Txt style={{ fontSize: 14, fontFamily: fonts.mono }}>
+                                            {p.signName} {p.degree.toFixed(2)}&deg;
+                                        </Txt>
+                                        <Txt style={{ fontSize: 12, color: colors.textFaint }}>House {p.house}</Txt>
+                                    </Box>
+                                </Box>
+                            </StaggerItem>
+                        );
+                    })}
+                </Card>
+            </Stagger>
+
+            <Reveal delay={1.15}>
+                <Txt style={{
+                    fontSize: 11, color: colors.textFaint, textAlign: 'center',
+                    lineHeight: 18, fontFamily: fonts.mono,
+                }}>
+                    {data.meta.engine} · {data.meta.ayanamsa} ayanamsa
+                    ({data.meta.ayanamsaValue.toFixed(4)}&deg;)
+                </Txt>
+            </Reveal>
         </Screen>
     );
 }

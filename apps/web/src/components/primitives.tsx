@@ -18,12 +18,25 @@ function css(...styles: Array<Style | undefined>): CSSProperties {
     return toWebStyle(merged) as CSSProperties;
 }
 
-export function Box({ style, children, onClick }: {
+export function Box({ style, children, onClick, active }: {
     style?: Style;
     children?: ReactNode;
     onClick?: () => void;
+    /**
+     * Marks this box as the selected one in a group, as `data-active`.
+     *
+     * A named prop rather than letting screens spread arbitrary DOM attributes
+     * through: `data-*` is a web concept, and the moment a screen writes one
+     * directly it stops being portable. React Native's equivalent is a ref on
+     * the selected row, which this same prop can drive.
+     */
+    active?: boolean;
 }) {
-    return <div style={css(style)} onClick={onClick}>{children}</div>;
+    return (
+        <div style={css(style)} onClick={onClick} data-active={active ? 'true' : undefined}>
+            {children}
+        </div>
+    );
 }
 
 export function Txt({ style, children, as = 'p' }: {
@@ -143,7 +156,10 @@ export function Screen({ children, title }: { children: ReactNode; title?: strin
     return (
         <Box style={{
             minHeight: '100vh',
-            backgroundColor: colors.background,
+            // Transparent, not the background colour: the starfield is painted
+            // once behind the whole app, and a screen that paints over it would
+            // put every page in a black box on top of the sky.
+            backgroundColor: 'transparent',
             padding: space.lg,
             // Keep content clear of the notch and the home indicator.
             paddingTop: 'calc(env(safe-area-inset-top) + 16px)',

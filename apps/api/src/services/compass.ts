@@ -71,14 +71,53 @@ async function cache(
         ON CONFLICT (birth_profile_id, local_date) DO NOTHING`;
 }
 
+/**
+ * Render one limb of the panchanga as text.
+ *
+ * `panchanga()` returns each limb as `{ index, name, percent }` — a shape
+ * `String()` turns into `"[object Object]"`. That is not a display bug: the
+ * basis below is serialised straight into the model's prompt, so coercion
+ * quietly deleted the tithi, nakshatra, yoga, karana and weekday from every
+ * reading while leaving prose that still looked authoritative.
+ *
+ * The nakshatra's pada is kept because it is load-bearing — it selects the
+ * dasha sub-period — and dropped for limbs that have none. `percent` is
+ * deliberately discarded: "39% elapsed" invites the model to predict when a
+ * tithi turns, which is a claim about the day the basis has not made.
+ */
+export function limbName(value: unknown): string {
+    if (typeof value === 'string') return value;
+    if (value === null || typeof value !== 'object') return 'unknown';
+
+    const limb = value as { name?: unknown; pada?: unknown };
+    if (typeof limb.name !== 'string' || limb.name.length === 0) return 'unknown';
+
+    return typeof limb.pada === 'number'
+        ? `${limb.name} (pada ${limb.pada})`
+        : limb.name;
+}
+
 /** The deterministic half. Computed whether or not a model is ever called. */
 export function computeBasis(profile: ProfileRow, date: string, timezone: string) {
     const at = DateTime.fromISO(date, { zone: timezone }).set({ hour: 9 });
-    const ctx = contextFor(profile);
+    const natal = contextFor(profile);
     const facts = buildFacts(profile, at, 3);
+
+    // Today's panchanga, not the birth chart's.
+    //
+    // `contextFor` builds the *birth* moment, so passing it here described the
+    // day someone was born and labelled it today — a compass whose weekday,
+    // tithi and nakshatra never changed for the life of the account. The
+    // transits above were already computed at `at`; only this was left behind.
+    //
+    // The birth coordinates are kept deliberately. Tithi, yoga and karana are
+    // functions of the Sun–Moon relationship and barely move with the observer,
+    // and vara depends on sunrise, which `panchanga` already approximates.
+    const today = { ...natal, dt: at };
+
     // PanchangaResult has no index signature; the fields read here are optional
     // by intent, so widen through unknown rather than narrow the shape.
-    const pan = panchanga(ctx) as unknown as Record<string, unknown>;
+    const pan = panchanga(today) as unknown as Record<string, unknown>;
 
     const moving = facts.transits.planets
         .filter(p => ['Jupiter', 'Saturn', 'Mars', 'Rahu', 'Ketu'].includes(p.name))
@@ -86,11 +125,11 @@ export function computeBasis(profile: ProfileRow, date: string, timezone: string
                 + `(${p.savBindus} bindus)${p.retrograde ? ', retrograde' : ''}`);
 
     return {
-        tithi: String(pan.tithi ?? 'unknown'),
-        nakshatra: String(pan.nakshatra ?? 'unknown'),
-        yoga: String(pan.yoga ?? 'unknown'),
-        karana: String(pan.karana ?? 'unknown'),
-        vara: String(pan.vara ?? 'unknown'),
+        tithi: limbName(pan.tithi),
+        nakshatra: limbName(pan.nakshatra),
+        yoga: limbName(pan.yoga),
+        karana: limbName(pan.karana),
+        vara: limbName(pan.vara),
         currentDasha: facts.dashaStack.map(d => `${d.levelName}: ${d.lord}`),
         saturnCycle: facts.transits.saturnCycle,
         notableTransits: moving,

@@ -14,7 +14,12 @@ export interface ProfileRow {
     userId: string;
     label: string;
     isPrimary: boolean;
-    birthDate: string;
+    /**
+     * Postgres `date`. postgres.js parses it into a `Date` at UTC midnight, so
+     * the declared type has to admit both — claiming `string` here is what let
+     * the conversion below go untested.
+     */
+    birthDate: string | Date;
     birthTime: string;
     timeAccuracy: 'exact' | 'approximate' | 'unknown';
     placeName: string;
@@ -31,13 +36,27 @@ export interface ProfileRow {
     updatedAt: Date;
 }
 
+/**
+ * Render a `date` column as `YYYY-MM-DD`.
+ *
+ * Shared because two callers need it — the wire mapping below and the chart
+ * service, which reads the row directly — and because the obvious spelling is
+ * wrong in a way that does not look wrong. `String(date)` yields
+ * `"Tue Aug 14 1990 20:00:00 GMT-0400"`: the format is unusable, and west of
+ * Greenwich it names the previous day. Reading the UTC components returns
+ * exactly the day Postgres stored, in every zone the server might run in.
+ */
+export function toCalendarDate(value: string | Date): string {
+    return typeof value === 'string' ? value : value.toISOString().slice(0, 10);
+}
+
 /** Postgres returns `numeric` as a string to avoid float loss; parse at the edge. */
 export function toBirthProfile(r: ProfileRow): BirthProfile {
     return {
         id: r.id,
         label: r.label,
         isPrimary: r.isPrimary,
-        birthDate: typeof r.birthDate === 'string' ? r.birthDate : String(r.birthDate),
+        birthDate: toCalendarDate(r.birthDate),
         birthTime: r.birthTime,
         timeAccuracy: r.timeAccuracy,
         placeName: r.placeName,

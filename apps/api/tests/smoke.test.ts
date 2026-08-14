@@ -46,6 +46,33 @@ describe('environment validation', () => {
         // The engine defaults must match what node-jhora verified against JHora.
         expect(env.OPENROUTER_BASE_URL).toBe('https://openrouter.ai/api/v1');
     });
+
+    /**
+     * `.env.example` documents these as `false`, and every deployment copies it.
+     * A naive string-to-boolean reads any non-empty string as true, which turns
+     * the documented value into its opposite: TLS demanded of a database that
+     * does not offer it, and every client IP reading as the proxy's so all
+     * users share one rate-limit bucket. Both fail in ways that look like
+     * something else.
+     */
+    test('reads a documented "false" as false, not as a non-empty string', () => {
+        resetEnv();
+        const env = loadEnv({ ...TEST_ENV, DATABASE_SSL: 'false', TRUST_PROXY: 'false' });
+        expect(env.DATABASE_SSL).toBe(false);
+        expect(env.TRUST_PROXY).toBe(false);
+    });
+
+    test('accepts the usual spellings of true', () => {
+        resetEnv();
+        const env = loadEnv({ ...TEST_ENV, DATABASE_SSL: 'true', TRUST_PROXY: '1' });
+        expect(env.DATABASE_SSL).toBe(true);
+        expect(env.TRUST_PROXY).toBe(true);
+    });
+
+    test('rejects a boolean it cannot interpret rather than guessing', () => {
+        resetEnv();
+        expect(() => loadEnv({ ...TEST_ENV, DATABASE_SSL: 'ture' })).toThrow(/DATABASE_SSL/);
+    });
 });
 
 describe('server', () => {
