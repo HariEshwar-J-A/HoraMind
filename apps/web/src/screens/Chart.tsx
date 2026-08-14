@@ -7,7 +7,8 @@ import { ChartWheel } from '../components/astro/ChartWheel.js';
 import { SouthChart } from '../components/astro/SouthChart.js';
 import { ChartStyleToggle } from '../components/astro/ChartStyleToggle.js';
 import { NakshatraDial } from '../components/astro/NakshatraDial.js';
-import { graha, natureColor } from '../components/astro/zodiac.js';
+import { graha } from '../components/astro/zodiac.js';
+import { PlanetBody } from '../components/astro/PlanetBody.js';
 import { api } from '../lib/api.js';
 import { usePrefs } from '../lib/prefs.js';
 import { brass, colors, fonts, space, radius } from '../theme/tokens.js';
@@ -130,12 +131,12 @@ export function Chart() {
                                     borderBottomWidth: 1, borderBottomStyle: 'solid', borderBottomColor: colors.border,
                                 }}>
                                     <Box style={{ display: 'flex', alignItems: 'center', gap: space.md }}>
-                                        <Txt as="span" style={{
-                                            fontSize: 20, fontFamily: fonts.display,
-                                            color: natureColor(g.nature), width: 24, textAlign: 'center',
-                                        }}>
-                                            {g.glyph}
-                                        </Txt>
+                                        {/* The same rendered body as the chart, so
+                                            a row and a cell are recognisably the
+                                            same planet. */}
+                                        <svg width={30} height={30} viewBox="0 0 20 20" aria-hidden="true">
+                                            <PlanetBody name={p.name} cx={10} cy={8} r={5} label={false} spin={false} />
+                                        </svg>
                                         <Box>
                                             <Txt style={{ fontSize: 16, fontWeight: '500' }}>{p.name}</Txt>
                                             <Txt style={{ fontSize: 11, color: colors.textFaint, fontFamily: fonts.display }}>

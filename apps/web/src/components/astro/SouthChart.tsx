@@ -1,6 +1,7 @@
 import { motion as m } from 'motion/react';
-import { brass, colors, fonts, motion as mo, space } from '../../theme/tokens.js';
-import { graha, natureColor, rashi } from './zodiac.js';
+import { brass, fonts, motion as mo, space } from '../../theme/tokens.js';
+import { rashi } from './zodiac.js';
+import { PlanetBody } from './PlanetBody.js';
 import type { WheelPlanet } from './ChartWheel.js';
 
 /**
@@ -110,9 +111,8 @@ export function SouthChart({ ascendantSign, planets, size = 400 }: {
                             </text>
 
                             {here.map((p, j) => {
-                                const g = graha(p.name);
-                                const gx = x + 4.5 + (j % 2) * 11;
-                                const gy = y + 12 + Math.floor(j / 2) * 8;
+                                const gx = x + 6 + (j % 2) * 12;
+                                const gy = y + 10 + Math.floor(j / 2) * 9;
                                 return (
                                     <m.g key={p.name}
                                         variants={{
@@ -124,22 +124,12 @@ export function SouthChart({ ascendantSign, planets, size = 400 }: {
                                         }}
                                         style={{ transformBox: 'fill-box', transformOrigin: 'center' }}
                                     >
-                                        <text
-                                            x={gx} y={gy}
-                                            textAnchor="middle"
-                                            fill={natureColor(g.nature)}
-                                            style={{ fontSize: 6.4, fontFamily: fonts.display }}
-                                        >
-                                            {g.glyph}
-                                        </text>
-                                        {p.retrograde && (
-                                            <text
-                                                x={gx + 4} y={gy - 3}
-                                                textAnchor="middle"
-                                                fill={colors.malefic}
-                                                style={{ fontSize: 2.8, fontFamily: fonts.mono }}
-                                            >r</text>
-                                        )}
+                                        <PlanetBody
+                                            name={p.name}
+                                            cx={gx} cy={gy}
+                                            r={2.3}
+                                            retrograde={p.retrograde}
+                                        />
                                     </m.g>
                                 );
                             })}

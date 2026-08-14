@@ -1,6 +1,7 @@
 import { motion as m } from 'motion/react';
-import { brass, colors, fonts, motion as mo, space } from '../../theme/tokens.js';
-import { graha, natureColor, rashi } from './zodiac.js';
+import { brass, fonts, motion as mo, space } from '../../theme/tokens.js';
+import { rashi } from './zodiac.js';
+import { PlanetBody } from './PlanetBody.js';
 
 /**
  * The North Indian kundli.
@@ -157,10 +158,18 @@ export function ChartWheel({ ascendantSign, planets, size = 400 }: {
                             </text>
 
                             {here.map((p, j) => {
-                                const g = graha(p.name);
                                 // Stack downwards from the centroid so a house
                                 // with four grahas stays inside its own region.
-                                const y = cy + j * 7 - (here.length - 1) * 2.6;
+                                // Four grahas in one house is common (a stellium
+                                // in Cancer here) and a single column runs off the
+                                // edge of the diagram. Past two, split into two
+                                // columns and tighten the rows.
+                                const twoCol = here.length > 2;
+                                const rows = twoCol ? Math.ceil(here.length / 2) : here.length;
+                                const col = twoCol ? j % 2 : 0;
+                                const row = twoCol ? Math.floor(j / 2) : j;
+                                const x = cx + (twoCol ? (col === 0 ? -5.5 : 5.5) : 0);
+                                const y = cy + row * 8.4 - (rows - 1) * 3.6;
                                 return (
                                     <m.g key={p.name}
                                         variants={{
@@ -173,26 +182,14 @@ export function ChartWheel({ ascendantSign, planets, size = 400 }: {
                                                 },
                                             },
                                         }}
-                                        style={{ transformOrigin: `${cx}px ${y}px` }}
+                                        style={{ transformBox: 'fill-box', transformOrigin: 'center' }}
                                     >
-                                        <text
-                                            x={cx} y={y}
-                                            textAnchor="middle"
-                                            fill={natureColor(g.nature)}
-                                            style={{ fontSize: 7, fontFamily: fonts.display }}
-                                        >
-                                            {g.glyph}
-                                        </text>
-                                        {p.retrograde && (
-                                            <text
-                                                x={cx + 5} y={y - 3}
-                                                textAnchor="middle"
-                                                fill={colors.malefic}
-                                                style={{ fontSize: 3.2, fontFamily: fonts.mono }}
-                                            >
-                                                r
-                                            </text>
-                                        )}
+                                        <PlanetBody
+                                            name={p.name}
+                                            cx={x} cy={y}
+                                            r={2.2}
+                                            retrograde={p.retrograde}
+                                        />
                                     </m.g>
                                 );
                             })}
