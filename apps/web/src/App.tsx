@@ -100,8 +100,30 @@ function Splash() {
     );
 }
 
+/**
+ * Which tab owns the current path.
+ *
+ * Longest prefix wins. `NavLink`'s own matching cannot express this: `to="/you"`
+ * matches `/you/life` as a prefix, so both tabs light up, and adding `end` to
+ * everything instead means `/you/devices` highlights nothing at all. Neither
+ * default is right once tab routes nest inside each other, so the decision is
+ * made here and handed to `NavLink` rather than inferred by it.
+ */
+function activeTabPath(pathname: string): string | undefined {
+    let best: string | undefined;
+    for (const tab of TABS) {
+        const hit = tab.path === '/'
+            ? pathname === '/'
+            : pathname === tab.path || pathname.startsWith(tab.path + '/');
+        if (hit && (best === undefined || tab.path.length > best.length)) best = tab.path;
+    }
+    return best;
+}
+
 function TabBar() {
     const { status, profile } = useSession();
+    const { pathname } = useLocation();
+    const active = activeTabPath(pathname);
     if (status !== 'authenticated' || !profile) return null;
 
     return (
@@ -118,8 +140,7 @@ function TabBar() {
                 <NavLink
                     key={tab.path}
                     to={tab.path}
-                    end={tab.path === '/'}
-                    style={({ isActive }) => ({
+                    style={() => ({
                         flex: 1,
                         minHeight: touchTarget,
                         display: 'flex',
@@ -129,20 +150,20 @@ function TabBar() {
                         paddingTop: space.md,
                         paddingBottom: space.md,
                         fontSize: 13,
-                        fontWeight: isActive ? 600 : 400,
-                        color: isActive ? colors.accent : colors.textMuted,
+                        fontWeight: tab.path === active ? 600 : 400,
+                        color: tab.path === active ? colors.accent : colors.textMuted,
                         textDecoration: 'none',
                         transition: 'color 180ms ease',
                     })}
                 >
-                    {({ isActive }) => (
+                    {() => (
                         <>
                             {/* One indicator, shared across tabs by `layoutId`:
                                 Motion tweens it from the old tab's position to
                                 the new one instead of cross-fading two bars, so
                                 the mark travels and the movement names which
                                 direction you went. */}
-                            {isActive && (
+                            {tab.path === active && (
                                 <m.span
                                     layoutId="hm-tab-indicator"
                                     transition={{ type: 'spring', stiffness: 420, damping: 34 }}

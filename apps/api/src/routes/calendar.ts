@@ -8,6 +8,7 @@ import * as profiles from '../repos/profiles.js';
 import * as users from '../repos/users.js';
 import { computeBasis } from '../services/compass.js';
 import { badRequest, notFound } from '../lib/errors.js';
+import { dayShape } from '../services/muhurta.js';
 
 /**
  * A week either side of today.
@@ -56,6 +57,24 @@ const Day = z.object({
      * precision this does not have.
      */
     mark: z.enum(['tender', 'ordinary', 'open']),
+
+    /**
+     * The day divided: sunrise, sunset, the inauspicious windows and the
+     * planetary horas. Entirely arithmetic — "avoid Rahu Kaal" is advice a
+     * great many people already follow and it has a fixed, checkable answer,
+     * so generating it would be inventing something that has a correct value.
+     */
+    sunrise: z.string(),
+    sunset: z.string(),
+    hasRiseSet: z.boolean(),
+    windows: z.array(z.object({
+        name: z.string(), from: z.string(), to: z.string(),
+        kind: z.enum(['avoid', 'favour']), note: z.string(),
+    })),
+    horas: z.array(z.object({
+        lord: z.string(), from: z.string(), to: z.string(),
+        good: z.string(), avoid: z.string(), current: z.boolean().optional(),
+    })),
 });
 
 export async function calendarRoutes(app: FastifyInstance): Promise<void> {
@@ -69,7 +88,12 @@ export async function calendarRoutes(app: FastifyInstance): Promise<void> {
                 'Panchanga and transits for a range of days. Deterministic — no model is called.',
             security: [{ bearerAuth: [] }],
             querystring: Query,
-            response: { 200: z.object({ days: z.array(Day), timezone: z.string() }) },
+            response: { 200: z.object({
+                days: z.array(Day),
+                timezone: z.string(),
+                /** The place these sunrise-relative windows are computed for. */
+                placeName: z.string(),
+            }) },
         },
     }, async (req, reply) => {
         const sql = getDb();
@@ -122,8 +146,33 @@ export async function calendarRoutes(app: FastifyInstance): Promise<void> {
                 : cycle === 5 ? 'open'
                 : 'ordinary';
 
+            // Sunrise depends on latitude, longitude AND offset, and all three
+            // have to describe the same place. Passing the *user's* zone with
+            // the *profile's* coordinates gives Chennai's sunrise expressed in
+            // UTC — arithmetically correct and practically nonsense. The whole
+            // triple comes from the profile, and the client says which place
+            // these times are for.
+            const atPlace = DateTime.fromISO(date, { zone: profile.timezone });
+
+            const shape = dayShape({
+                date,
+                weekday: atPlace.weekday % 7,
+                lat: Number(profile.latitude),
+                lon: Number(profile.longitude),
+                tzOffsetMinutes: atPlace.offset,
+                nowMinutes: date === today.toISODate()
+                    ? DateTime.now().setZone(profile.timezone).hour * 60
+                        + DateTime.now().setZone(profile.timezone).minute
+                    : undefined,
+            });
+
             days.push({
                 date,
+                sunrise: shape.sunrise,
+                sunset: shape.sunset,
+                hasRiseSet: shape.hasRiseSet,
+                windows: shape.windows,
+                horas: shape.horas,
                 relation: date === today.toISODate() ? 'today' as const
                     : d < today ? 'past' as const : 'future' as const,
                 vara: basis.vara,
@@ -137,6 +186,10 @@ export async function calendarRoutes(app: FastifyInstance): Promise<void> {
             });
         }
 
-        return reply.status(200).send({ days, timezone: zone });
+        return reply.status(200).send({
+            days,
+            timezone: profile.timezone,
+            placeName: profile.placeName,
+        });
     });
 }

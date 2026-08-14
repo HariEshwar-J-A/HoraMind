@@ -39,6 +39,9 @@ interface CalendarDay {
     dasha: string[];
     transits: string[];
     mark: 'tender' | 'ordinary' | 'open';
+    sunrise: string; sunset: string; hasRiseSet: boolean;
+    windows: Array<{ name: string; from: string; to: string; kind: 'avoid' | 'favour'; note: string }>;
+    horas: Array<{ lord: string; from: string; to: string; good: string; avoid: string; current?: boolean }>;
 }
 
 const MARK_COLOR: Record<CalendarDay['mark'], string> = {
@@ -81,7 +84,7 @@ export function Today() {
         retry: 1,
     });
 
-    const calendar = useQuery<{ days: CalendarDay[]; timezone: string }>({
+    const calendar = useQuery<{ days: CalendarDay[]; timezone: string; placeName: string }>({
         queryKey: ['calendar'],
         queryFn: () => api.get('/v1/calendar'),
         staleTime: 1000 * 60 * 30,
@@ -214,6 +217,152 @@ export function Today() {
                                 : 'Computed positions for that day, so you can check them against what actually happened.'}
                         </Txt>
                     </Card>
+                </Reveal>
+            )}
+
+            {/* Right now — the single most day-to-day useful thing here. */}
+            {open?.horas?.find(h => h.current) && (
+                <Reveal delay={0.08}>
+                    <Card style={{ borderColor: brass.deep }}>
+                        <Txt style={{
+                            fontSize: 11, color: colors.textMuted, letterSpacing: 1,
+                            fontFamily: fonts.mono, marginBottom: space.sm,
+                        }}>
+                            RIGHT NOW
+                        </Txt>
+                        {(() => {
+                            const h = open.horas.find(x => x.current)!;
+                            return (
+                                <>
+                                    <Txt style={{ fontSize: 17, fontFamily: fonts.display, color: brass.light }}>
+                                        {h.lord} hora · {h.from}&ndash;{h.to}
+                                    </Txt>
+                                    <Txt style={{ fontSize: 14, lineHeight: 21, marginTop: space.sm }}>
+                                        Good for: {h.good}
+                                    </Txt>
+                                    <Txt style={{ fontSize: 13, color: colors.textMuted, lineHeight: 20, marginTop: space.xs }}>
+                                        Hold off on: {h.avoid}
+                                    </Txt>
+                                </>
+                            );
+                        })()}
+                    </Card>
+                </Reveal>
+            )}
+
+            {/* Windows to use and windows to avoid. */}
+            {open && open.windows.length > 0 && (
+                <Reveal delay={0.1}>
+                    <Card>
+                        <Box style={{
+                            display: 'flex', justifyContent: 'space-between',
+                            marginBottom: space.md,
+                        }}>
+                            <Txt style={{
+                                fontSize: 11, color: colors.textMuted, letterSpacing: 1,
+                                fontFamily: fonts.mono,
+                            }}>
+                                TIMES THAT DAY
+                            </Txt>
+                            <Txt style={{ fontSize: 11, color: colors.textFaint, fontFamily: fonts.mono }}>
+                                {open.sunrise} &ndash; {open.sunset}
+                            </Txt>
+                        </Box>
+
+                        {/* Which place these are for. Every window here is a
+                            division of daylight, so it is only right for one
+                            location — and the app knows the birth place, not
+                            where the reader is standing. Saying so is cheaper
+                            than being quietly wrong for anyone who moved. */}
+                        <Txt style={{
+                            fontSize: 11, color: colors.textFaint,
+                            marginBottom: space.md, lineHeight: 17,
+                        }}>
+                            Sunrise to sunset at {calendar.data?.placeName}. If you are
+                            elsewhere today, these shift with your local sunrise.
+                        </Txt>
+
+                        {!open.hasRiseSet && (
+                            <Txt style={{ fontSize: 12, color: colors.textFaint, marginBottom: space.sm, lineHeight: 18 }}>
+                                The sun does not rise or set at your latitude on this date, so these
+                                windows are shown against a nominal day.
+                            </Txt>
+                        )}
+
+                        {/* Favourable first: someone opening this wants to know
+                            when they can act, not only when they cannot. */}
+                        {[...open.windows].sort(a => (a.kind === 'favour' ? -1 : 1)).map(w => (
+                            <Box key={w.name} style={{
+                                paddingTop: space.md, paddingBottom: space.md,
+                                borderBottomWidth: 1, borderBottomStyle: 'solid',
+                                borderBottomColor: colors.border,
+                            }}>
+                                <Box style={{
+                                    display: 'flex', justifyContent: 'space-between',
+                                    alignItems: 'baseline', gap: space.md,
+                                }}>
+                                    <Txt style={{
+                                        fontSize: 15,
+                                        color: w.kind === 'favour' ? colors.benefic : colors.malefic,
+                                    }}>
+                                        {w.name}
+                                    </Txt>
+                                    <Txt style={{ fontSize: 14, fontFamily: fonts.mono, whiteSpace: 'nowrap' }}>
+                                        {w.from}&ndash;{w.to}
+                                    </Txt>
+                                </Box>
+                                <Txt style={{
+                                    fontSize: 12, color: colors.textFaint,
+                                    lineHeight: 18, marginTop: space.xs,
+                                }}>
+                                    {w.note}
+                                </Txt>
+                            </Box>
+                        ))}
+                    </Card>
+                </Reveal>
+            )}
+
+            {/* The full hora table, folded away. */}
+            {open && open.horas.length > 0 && (
+                <Reveal delay={0.12}>
+                    <details>
+                        <summary style={{
+                            color: colors.textMuted, fontSize: 14, cursor: 'pointer',
+                            padding: space.md, listStyle: 'none',
+                        }}>
+                            Hour by hour — what each part of the day suits
+                        </summary>
+                        <Card style={{ marginTop: space.sm }}>
+                            {open.horas.map((h, i) => (
+                                <Box key={i} style={{
+                                    display: 'flex', gap: space.md,
+                                    paddingTop: space.sm, paddingBottom: space.sm,
+                                    borderBottomWidth: 1, borderBottomStyle: 'solid',
+                                    borderBottomColor: colors.border,
+                                    backgroundColor: h.current ? colors.surfaceRaised : 'transparent',
+                                }}>
+                                    <Txt style={{
+                                        fontSize: 12, fontFamily: fonts.mono,
+                                        color: colors.textFaint, width: 84, flexShrink: 0,
+                                    }}>
+                                        {h.from}&ndash;{h.to}
+                                    </Txt>
+                                    <Box style={{ minWidth: 0 }}>
+                                        <Txt style={{
+                                            fontSize: 13,
+                                            color: h.current ? brass.light : colors.text,
+                                        }}>
+                                            {h.lord}
+                                        </Txt>
+                                        <Txt style={{ fontSize: 12, color: colors.textMuted, lineHeight: 18 }}>
+                                            {h.good}
+                                        </Txt>
+                                    </Box>
+                                </Box>
+                            ))}
+                        </Card>
+                    </details>
                 </Reveal>
             )}
 
