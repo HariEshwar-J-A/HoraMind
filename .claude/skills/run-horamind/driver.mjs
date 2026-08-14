@@ -316,11 +316,15 @@ class Cdp {
      * something is on screen rather than merely in the document.
      */
     async settled({ timeout = 15000 } = {}) {
+        // Elements carrying an inline opacity are *deliberately* translucent —
+        // past days in the strip sit at 0.62 — so demanding everything reach
+        // 1 can never be satisfied and the wait just times out. Only elements
+        // Motion is driving are checked, and those are the ones that start at 0.
         await this.waitFor(`
             [...document.querySelectorAll('div')]
-                .filter(el => el.textContent.trim().length > 2)
+                .filter(el => el.textContent.trim().length > 2 && !el.style.opacity)
                 .every(el => parseFloat(getComputedStyle(el).opacity) > 0.95)
-        `, { timeout, label: 'all reveals opaque' });
+        `, { timeout, label: 'animated reveals opaque' });
         // One more frame so the final paint is committed before capture.
         await new Promise(r => setTimeout(r, 250));
     }
@@ -483,7 +487,9 @@ async function webFlow() {
         });
 
         await step('You screen round-trips a memory', async () => {
-            await cdp.clickWhenReady('you');
+            // The tab is labelled by what you do there, not what it holds; it was
+            // renamed You -> Me when Today absorbed the calendar.
+            await cdp.clickWhenReady('me');
             await cdp.waitFor(`document.body.innerText.includes('ADD A MEMORY')`, { label: 'You screen' });
             await cdp.eval(`__hmSet('input[type=text]', 'driver memory ${Date.now()}')`);
             await cdp.clickWhenReady('save memory');

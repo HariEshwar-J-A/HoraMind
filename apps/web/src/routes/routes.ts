@@ -44,9 +44,10 @@ export const ROUTES: RouteDef[] = [
     { path: '/you/life', screen: 'Life',    tabLabel: 'Life',    requiresAuth: true, requiresProfile: true, title: 'Your life' },
     { path: '/you',     screen: 'You',      tabLabel: 'Me',      requiresAuth: true, requiresProfile: true, title: 'You' },
 
-    // Kept as a route so an existing link or bookmark still resolves; it is no
-    // longer a tab because Today absorbed it.
-    { path: '/calendar', screen: 'Calendar', requiresAuth: true, requiresProfile: true, title: 'Calendar' },
+    // Today absorbed the calendar, so /calendar renders Today rather than a
+    // second screen showing the same fortnight. Kept as a route because an old
+    // link should land somewhere real, not on a redirect to the root.
+    { path: '/calendar', screen: 'Today', requiresAuth: true, requiresProfile: true, title: 'Today' },
 
     // Reachable from You rather than the tab bar: five tabs is already the most
     // a thumb can reach comfortably, and this is a screen someone opens
