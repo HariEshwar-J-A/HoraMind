@@ -19,21 +19,22 @@ Branch: `feat/vedic-ui-and-fixes`.
 
 | Area | State |
 |---|---|
-| API | Fastify, all routes working, 138 tests |
-| Web | React/Vite PWA, 22 tests |
+| API | Fastify, all routes working, including `/v1/charts/now` and notifications |
+| Web | React/Vite PWA, rebranded iAstro |
 | Charts | North + South Indian, toggle, nakshatra dial, rendered planet bodies |
 | Calendar | ±7 days, deterministic, no model calls |
 | Life analysis | 5 sections, screened, hash-based staleness |
-| Guard rails | Input + output screening, per-route rate limits |
+| Guard rails | Input + output screening, per-route rate limits, hollow-200 retry |
 | Edit details | Full edit with cache invalidation |
-| `packages/ui` | "Antara" — 6 components + scrollbar + overflow rules |
-| Beautiful UI | All 19 vendored, re-themed, **5 mounted** |
+| `packages/ui` | Antara — layout, controls, feedback, scrollbar, overflow, shadcn tokens |
+| Landing | Live `ChartWheel` hero at `/` when signed out |
+| Notifications | Schema, API, detector, bell, prefs, quiet hours |
 | Run tooling | `driver.mjs` (23 assertions), `audit.mjs` (15 screens × 2 widths) |
 
 ## Not built
 
-Landing page · notifications · iAstro rebrand · shadcn layer · the component
-library proper · responsive desktop layout · i18n · offline caching · app icons.
+shadcn *components* (tokens are mapped; Antara covers the inventory) ·
+email channel for notifications · full locale packs beyond `t()` + `en`.
 
 ---
 

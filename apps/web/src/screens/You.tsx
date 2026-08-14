@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import type { Memory, Interest, InterestPromptState } from '@horamind/shared';
 import { Screen, Card, Button, Field, Txt, Box, Notice } from '../components/primitives.js';
+import { NotifyPrefs } from '../components/notify/Prefs.js';
+import { ErrorState } from '@horamind/ui';
 import { api } from '../lib/api.js';
 import { useSession } from '../lib/session.js';
 import { colors, space } from '../theme/tokens.js';
@@ -55,6 +57,14 @@ export function You() {
 
     return (
         <Screen title="You">
+            {memories.isError && (
+                <ErrorState
+                    title="Could not load memories"
+                    hint="A retry refetches this list without reloading the page."
+                    onRetry={() => void memories.refetch()}
+                />
+            )}
+
             {prompt.data?.due && (
                 <Card style={{ borderColor: colors.accent }}>
                     <Txt style={{ fontSize: 17, fontWeight: '600', marginBottom: space.sm }}>
@@ -159,6 +169,8 @@ export function You() {
                 <Button variant="ghost" style={{ marginTop: space.sm }} label="Sign out"
                         onPress={() => void signOut().then(() => navigate('/sign-in'))} />
             </Card>
+
+            <NotifyPrefs />
         </Screen>
     );
 }

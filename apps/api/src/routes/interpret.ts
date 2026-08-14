@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { DateTime } from 'luxon';
 
 import { getDb } from '../db/client.js';
-import { screenQuestion, screenAnswer, REFUSAL } from '../lib/safety.js';
+import { screenQuestion, presentAnswer } from '../lib/safety.js';
 import { loadEnv } from '../config/env.js';
 import * as profiles from '../repos/profiles.js';
 import * as mem from '../repos/memories.js';
@@ -150,13 +150,13 @@ export async function interpretRoutes(app: FastifyInstance): Promise<void> {
             // that ignores it returns text indistinguishable from text that
             // obeyed. This is the only thing between a confident sentence about
             // someone's death and a user reading it.
-            const screened = screenAnswer(result.answer);
-            if (!screened.ok) {
-                req.log.warn({ reasons: screened.reasons }, 'interpretation refused by output screen');
+            const answer = presentAnswer(result.answer);
+            if (answer !== result.answer) {
+                req.log.warn('interpretation refused by output screen');
             }
 
             return reply.status(200).send({
-                answer: screened.ok ? result.answer : REFUSAL,
+                answer,
                 citations: result.citations,
                 // Returned alongside the prose so a client can show the reasoning
                 // the answer rests on rather than asking to be believed.

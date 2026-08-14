@@ -59,7 +59,7 @@ export function SouthChart({ ascendantSign, planets, size = 400 }: {
                 role="img"
                 aria-label={`South Indian chart, ${rashi(ascendantSign).english} ascendant`}
                 initial="hidden" animate="shown"
-                style={{ maxWidth: '100%', height: 'auto' }}
+                style={{ maxWidth: '100%', height: 'auto', direction: 'ltr' }}
             >
                 <defs>
                     <linearGradient id="hm-brass-s" x1="0" y1="0" x2="1" y2="1">

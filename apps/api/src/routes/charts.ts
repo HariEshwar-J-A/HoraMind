@@ -1,11 +1,12 @@
 import type { FastifyInstance } from 'fastify';
 import type { ZodTypeProvider } from 'fastify-type-provider-zod';
 import { z } from 'zod';
+import { DateTime } from 'luxon';
 
 import { getDb } from '../db/client.js';
 import * as profiles from '../repos/profiles.js';
 import * as charts from '../services/charts.js';
-import { notFound } from '../lib/errors.js';
+import { notFound, badRequest } from '../lib/errors.js';
 
 /**
  * Chart endpoints.
@@ -36,6 +37,34 @@ const ProfileQuery = z.object({ profileId: z.string().uuid().optional() });
 
 export async function chartRoutes(app: FastifyInstance): Promise<void> {
     const typed = app.withTypeProvider<ZodTypeProvider>();
+
+    /**
+     * The sky right now, for anyone.
+     *
+     * No profile, no persistence, no model. The landing page draws this while
+     * the visitor watches — the strongest claim the product can make without
+     * asking them to sign in. Tight IP rate limit because it is unauthenticated
+     * and still runs the ephemeris.
+     */
+    typed.get('/charts/now', {
+        config: { rateLimit: { max: 30, timeWindow: '1 minute' } },
+        schema: {
+            tags: ['charts'],
+            description:
+                'Planets at this instant for a given location. Unauthenticated; nothing is stored.',
+            querystring: z.object({
+                lat: z.coerce.number().min(-90).max(90).default(51.4769),
+                lon: z.coerce.number().min(-180).max(180).default(-0.0005),
+            }),
+        },
+    }, async (req, reply) => {
+        const { lat, lon } = req.query;
+        if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
+            throw badRequest('Latitude and longitude must be finite numbers');
+        }
+        const ctx = charts.contextAt({ dt: DateTime.utc(), latitude: lat, longitude: lon });
+        return reply.status(200).send(charts.natalChart(ctx));
+    });
 
     typed.get('/charts/natal', {
         onRequest: [app.authenticate],

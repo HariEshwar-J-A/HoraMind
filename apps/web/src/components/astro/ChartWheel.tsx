@@ -152,7 +152,7 @@ export function ChartWheel({ ascendantSign, planets, size = 560 }: {
                 aria-label={`North Indian chart, ${rashi(ascendantSign).english} ascendant`}
                 initial="hidden"
                 animate="shown"
-                style={{ width: '100%', maxWidth: size, height: 'auto', overflow: 'visible' }}
+                style={{ width: '100%', maxWidth: size, height: 'auto', overflow: 'visible', direction: 'ltr' }}
             >
                 <defs>
                     {/* Gold leaf: brighter at the top-left, as if lit from there. */}

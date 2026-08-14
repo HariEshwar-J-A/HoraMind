@@ -44,7 +44,7 @@ export function SignIn() {
     return (
         <Screen>
             <Box style={{ marginTop: space.xxxl, marginBottom: space.xl }}>
-                <Txt as="h1" style={{ fontSize: 32, fontWeight: '600' }}>HoraMind</Txt>
+                <Txt as="h1" style={{ fontSize: 32, fontWeight: '600' }}>iAstro</Txt>
                 <Txt style={{ color: colors.textMuted, marginTop: space.sm }}>
                     Vedic astrology, computed properly.
                 </Txt>

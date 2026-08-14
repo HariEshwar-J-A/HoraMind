@@ -3,7 +3,7 @@
     "version": "1.0.0",
     "private": true,
     "type": "module",
-    "description": "Antara — HoraMind's design system. An engineered instrument, not a dashboard.",
+    "description": "Antara — iAstro's design system. An engineered instrument, not a dashboard.",
     "main": "./src/index.tsx",
     "exports": { ".": "./src/index.tsx", "./styles.css": "./src/antara.css" },
     "scripts": { "lint": "eslint src" },

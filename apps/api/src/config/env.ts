@@ -87,8 +87,21 @@ const EnvSchema = z.object({
 
     OPENROUTER_API_KEY: z.string().optional(),
     OPENROUTER_BASE_URL: z.string().url().default('https://openrouter.ai/api/v1'),
-    OPENROUTER_MODEL_FREE: z.string().default('meta-llama/llama-3.3-70b-instruct:free'),
+    /**
+     * `meta-llama/llama-3.3-70b-instruct:free` was retired. The paid twin still
+     * returns hollow 200s when OpenRouter routes it to DeepInfra. Gemini Flash
+     * is single-provider, so it cannot hit that raffle.
+     */
+    OPENROUTER_MODEL_FREE: z.string().default('google/gemini-2.5-flash'),
     OPENROUTER_MODEL_PAID: z.string().default('anthropic/claude-sonnet-4.5'),
+
+    /**
+     * Web Push. All three must be set together or push is simply not offered;
+     * in-app notifications still work. Generate with `npx web-push generate-vapid-keys`.
+     */
+    VAPID_PUBLIC_KEY: z.string().optional(),
+    VAPID_PRIVATE_KEY: z.string().optional(),
+    VAPID_SUBJECT: z.string().optional(),
 
     /** Public base URL, used for OAuth redirects and links in transactional email. */
     PUBLIC_BASE_URL: z.string().url().default('http://localhost:8080'),

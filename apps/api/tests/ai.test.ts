@@ -106,7 +106,7 @@ describe('prompt assembly', () => {
         });
 
         expect(messages[0]!.role).toBe('system');
-        expect(messages[0]!.content).toContain('HoraMind');
+        expect(messages[0]!.content).toContain('iAstro');
 
         const last = messages[messages.length - 1]!;
         expect(last.role).toBe('user');
@@ -204,12 +204,45 @@ describe('openrouter error mapping', () => {
         const init = spy.mock.calls[0]![1] as RequestInit;
         const headers = init.headers as Record<string, string>;
         expect(headers['Authorization']).toBe('Bearer sk-or-test-key-not-real');
-        expect(headers['X-Title']).toBe('HoraMind');
+        expect(headers['X-Title']).toBe('iAstro');
     });
 
     test('cost lookup returns null rather than throwing when unavailable', async () => {
         // Billing reconciliation must never be able to fail a user's reading.
         stubFetch(500, {});
         expect(await openrouter.fetchCost(env, 'gen-123')).toBeNull();
+    });
+
+    test('a hollow 200 is retried once, skipping DeepInfra on the second try', async () => {
+        const hollow = {
+            choices: [{ message: { content: null }, finish_reason: null }],
+        };
+        const ok = {
+            choices: [{ message: { content: 'A reading.', tool_calls: [] }, finish_reason: 'stop' }],
+            usage: { prompt_tokens: 10, completion_tokens: 4, total_tokens: 14 },
+        };
+        const spy = vi.fn()
+            .mockResolvedValueOnce(new Response(JSON.stringify(hollow), {
+                status: 200, headers: { 'content-type': 'application/json' },
+            }))
+            .mockResolvedValueOnce(new Response(JSON.stringify(ok), {
+                status: 200, headers: { 'content-type': 'application/json' },
+            }));
+        vi.stubGlobal('fetch', spy);
+
+        const result = await openrouter.complete(env, { model: 'x', messages: [] });
+        expect(result.content).toBe('A reading.');
+        expect(spy).toHaveBeenCalledTimes(2);
+
+        const second = JSON.parse(String((spy.mock.calls[1]![1] as RequestInit).body)) as {
+            provider?: { ignore?: string[] };
+        };
+        expect(second.provider?.ignore).toContain('DeepInfra');
+    });
+
+    test('a hollow 200 that stays hollow is a 502, not a blank reading', async () => {
+        stubFetch(200, { choices: [{ message: { content: null }, finish_reason: null }] });
+        await expect(openrouter.complete(env, { model: 'x', messages: [] }))
+            .rejects.toMatchObject({ statusCode: 502 });
     });
 });

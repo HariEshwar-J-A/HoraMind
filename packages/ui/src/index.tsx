@@ -1,8 +1,21 @@
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { motion as m, useReducedMotion } from 'motion/react';
+import { antara, spring, springSoft } from './tokens.js';
+import { Clamp } from './clamp.js';
+
+export { antara, spring, springSoft } from './tokens.js';
+export { Clamp } from './clamp.js';
+export { Stack, Row, Grid, Section, Shell } from './layout.js';
+export {
+    Button as AntaraButton, IconButton, Field as AntaraField, Select, DateField,
+    Tabs, Accordion, Sheet,
+} from './controls.js';
+export {
+    Skeleton, Badge, Avatar, Progress, ErrorState, Tooltip, Table, ToastStack,
+} from './feedback.js';
 
 /**
- * Antara — HoraMind's design system.
+ * Antara — iAstro's design system.
  *
  * A workspace package rather than a folder, so the app depends on it by name
  * and cannot reach past its exports into internals. That boundary is the point:
@@ -21,29 +34,6 @@ import { motion as m, useReducedMotion } from 'motion/react';
  * mechanical, and `className="p-4"` is valid in neither world once you leave
  * the browser.
  */
-
-// ---------------------------------------------------------------------------
-// Tokens
-// ---------------------------------------------------------------------------
-
-export const antara = {
-    ink: 'var(--color-ink, #f0ece1)',
-    inkMuted: 'var(--color-ink-2, #a8acc2)',
-    inkFaint: 'var(--color-ink-3, #767c99)',
-    surface: 'var(--color-surface, #151827)',
-    raised: 'var(--color-hover, #1e2235)',
-    line: 'var(--color-line, #2a2f45)',
-    lineStrong: 'var(--color-line-strong, #3a4160)',
-    brass: 'var(--color-accent, #c9a227)',
-    brassLit: 'var(--color-accent-ink, #e8ce7a)',
-    good: 'var(--color-green, #5bc98c)',
-    warn: 'var(--color-orange, #e2915b)',
-    bad: 'var(--color-red, #e2725b)',
-} as const;
-
-/** A spring, not a duration. Weighted things should settle, not stop. */
-export const spring = { type: 'spring' as const, stiffness: 380, damping: 32 };
-export const springSoft = { type: 'spring' as const, stiffness: 210, damping: 26 };
 
 // ---------------------------------------------------------------------------
 // Surfaces
@@ -191,39 +181,7 @@ export function Segmented<T extends string>({ value, options, onChange, label }:
 // Feedback
 // ---------------------------------------------------------------------------
 
-/**
- * Text that cannot overflow its container.
- *
- * Two failure modes, one component. `lines={1}` truncates with an ellipsis;
- * more than one clamps. Both set `min-width: 0`, without which a flex parent
- * refuses to shrink the child below its content and the truncation silently
- * does nothing — the row overflows instead, which is the confusing outcome.
- *
- * `title` carries the full string so a truncated value is still recoverable by
- * hover and by a screen reader.
- */
-export function Clamp({ children, lines = 1, style }: {
-    children: string;
-    lines?: number;
-    style?: CSSProperties;
-}) {
-    return (
-        <span
-            title={children}
-            style={{
-                display: '-webkit-box',
-                WebkitLineClamp: lines,
-                WebkitBoxOrient: 'vertical',
-                overflow: 'hidden',
-                overflowWrap: 'anywhere',
-                minWidth: 0,
-                ...style,
-            }}
-        >
-            {children}
-        </span>
-    );
-}
+// Clamp lives in clamp.ts and is re-exported above.
 
 /**
  * The empty state.

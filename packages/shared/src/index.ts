@@ -13,3 +13,4 @@ export * from './schemas/auth.js';
 export * from './schemas/birth.js';
 export * from './schemas/memory.js';
 export * from './schemas/chat.js';
+export * from './schemas/notifications.js';

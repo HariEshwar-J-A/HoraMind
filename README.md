@@ -1,4 +1,7 @@
-# HoraMind 🪐
+# iAstro 🪐
+
+Vedic astrology, computed properly. Free. No ads. No data sale. Conversations
+deleted after 7 days.
 
 By [Harieshwar Jagan Abirami](https://github.com/HariEshwar-J-A)
 
@@ -12,8 +15,8 @@ which reproduces Jagannatha Hora's conventions to sub-arcsecond agreement.
 Classical rules come from [`JyotishBase`](https://github.com/HariEshwar-J-A/JyotishBase).
 The language model presents computed facts — it does not invent them.
 
-> **Note:** HoraMind was previously an OpenClaw-based Telegram agent. It is now a
-> standalone HTTP backend with a React Native client. The interpretation rules in
+> **Note:** iAstro was previously HoraMind, an OpenClaw-based Telegram agent.
+> It is now a standalone HTTP backend with a React PWA. The interpretation rules in
 > `agent_config/prediction-method.md` carried over unchanged; the OpenClaw
 > runtime, the Telegram transport and the file-based user store did not.
 

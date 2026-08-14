@@ -24,7 +24,9 @@ import { chatRoutes } from './routes/chat.js';
 import { compassRoutes } from './routes/compass.js';
 import { calendarRoutes } from './routes/calendar.js';
 import { lifeRoutes } from './routes/life.js';
+import { notificationRoutes } from './routes/notifications.js';
 import { retentionPlugin } from './plugins/retention.js';
+import { notifyPlugin } from './plugins/notify.js';
 
 /**
  * Fastify application factory.
@@ -94,7 +96,7 @@ export async function buildServer(env: Env = loadEnv()): Promise<FastifyInstance
     await app.register(swagger, {
         openapi: {
             info: {
-                title: 'HoraMind API',
+                title: 'iAstro API',
                 description: 'Vedic astrology computation, retrieval and interpretation.',
                 version: '2.0.0',
             },
@@ -118,7 +120,10 @@ export async function buildServer(env: Env = loadEnv()): Promise<FastifyInstance
 
     // Scheduled hard-deletes. Registered only outside tests, so a suite never
     // starts a timer that outlives the assertions it was built for.
-    if (env.NODE_ENV !== 'test') await app.register(retentionPlugin);
+    if (env.NODE_ENV !== 'test') {
+        await app.register(retentionPlugin);
+        await app.register(notifyPlugin);
+    }
 
     await app.register(healthRoutes);
     await app.register(authRoutes,    { prefix: '/v1' });
@@ -132,6 +137,7 @@ export async function buildServer(env: Env = loadEnv()): Promise<FastifyInstance
     await app.register(compassRoutes, { prefix: '/v1' });
     await app.register(calendarRoutes, { prefix: '/v1' });
     await app.register(lifeRoutes,     { prefix: '/v1' });
+    await app.register(notificationRoutes, { prefix: '/v1' });
 
     return app;
 }

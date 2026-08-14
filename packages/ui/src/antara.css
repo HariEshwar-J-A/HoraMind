@@ -151,3 +151,39 @@ html, body {
 .antara-row > * {
     min-width: 0;
 }
+
+@keyframes antara-spin {
+    to { transform: rotate(360deg); }
+}
+
+/*
+ * shadcn/ui variable contract, pointed at Antara.
+ *
+ * shadcn components are copy-pasted, not a runtime. If one is vendored later
+ * it inherits this palette automatically — the same trick Beautiful UI uses.
+ * The components themselves stay out of this package until they are needed:
+ * Antara already covers the inventory, and pulling Radix in to restyle a
+ * button we already have would be a third token layer.
+ */
+:root {
+    --background: #0b0d17;
+    --foreground: #f0ece1;
+    --card: #151827;
+    --card-foreground: #f0ece1;
+    --popover: #151827;
+    --popover-foreground: #f0ece1;
+    --primary: #c9a227;
+    --primary-foreground: #1a1503;
+    --secondary: #1e2235;
+    --secondary-foreground: #f0ece1;
+    --muted: #1e2235;
+    --muted-foreground: #a8acc2;
+    --accent: #c9a227;
+    --accent-foreground: #1a1503;
+    --destructive: #e2725b;
+    --destructive-foreground: #f0ece1;
+    --border: #2a2f45;
+    --input: #2a2f45;
+    --ring: #e8ce7a;
+    --radius: 0.625rem;
+}

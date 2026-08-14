@@ -19,10 +19,10 @@ export default defineConfig({
             registerType: 'prompt',
             includeAssets: ['favicon.svg'],
             manifest: {
-                name: 'HoraMind — Vedic Astrology',
-                short_name: 'HoraMind',
+                name: 'iAstro',
+                short_name: 'iAstro',
                 description:
-                    'Vedic astrology grounded in a verified ephemeris and classical sources.',
+                    'Free. No ads. No data sale. Vedic astrology grounded in a verified ephemeris and classical sources.',
                 theme_color: '#0B0D17',
                 background_color: '#0B0D17',
                 display: 'standalone',
@@ -48,6 +48,14 @@ export default defineConfig({
                 // transits looks authoritative and is wrong.
                 navigateFallbackDenylist: [/^\/api/],
                 runtimeCaching: [
+                    {
+                        urlPattern: ({ url }) => url.pathname === '/api/v1/charts/natal',
+                        handler: 'StaleWhileRevalidate',
+                        options: {
+                            cacheName: 'natal-chart',
+                            expiration: { maxEntries: 4, maxAgeSeconds: 60 * 60 * 24 * 30 },
+                        },
+                    },
                     {
                         urlPattern: /^\/api\//,
                         handler: 'NetworkOnly',

@@ -93,11 +93,35 @@ function headers(env: Env): Record<string, string> {
         'Authorization': `Bearer ${env.OPENROUTER_API_KEY}`,
         'Content-Type': 'application/json',
         'HTTP-Referer': env.PUBLIC_BASE_URL,
-        'X-Title': 'HoraMind',
+        'X-Title': 'iAstro',
     };
 }
 
+/**
+ * A 200 that contains nothing.
+ *
+ * OpenRouter sometimes routes a model to DeepInfra, which answers HTTP 200
+ * with null content, no tool_calls, no usage, and `finish_reason: null`.
+ * Treating that as a successful empty reading would show the user a blank
+ * card and bill them for it. Detecting it here means we can retry once on a
+ * different provider before giving up.
+ */
+function isHollow(choice: OpenRouterChoice | undefined): boolean {
+    const content = choice?.message?.content;
+    const tools = choice?.message?.tool_calls ?? [];
+    const hasText = typeof content === 'string' && content.trim().length > 0;
+    return !hasText && tools.length === 0;
+}
+
 export async function complete(env: Env, req: CompletionRequest): Promise<CompletionResult> {
+    return completeAttempt(env, req, 0);
+}
+
+async function completeAttempt(
+    env: Env,
+    req: CompletionRequest,
+    attempt: number,
+): Promise<CompletionResult> {
     const started = Date.now();
 
     // Built before the try. Inside it, a missing API key would be caught and
@@ -120,6 +144,9 @@ export async function complete(env: Env, req: CompletionRequest): Promise<Comple
                 // Ask for usage even on streamed responses; without it the
                 // metering row would be written with nulls.
                 usage: { include: true },
+                // Second try: skip the provider that has been observed to
+                // return hollow 200s. Harmless on the first try (omitted).
+                ...(attempt > 0 ? { provider: { ignore: ['DeepInfra'] } } : {}),
             }),
         });
     } catch (err) {
@@ -152,6 +179,14 @@ export async function complete(env: Env, req: CompletionRequest): Promise<Comple
     }
 
     const choice = body?.choices?.[0];
+
+    if (isHollow(choice) && attempt === 0) {
+        return completeAttempt(env, req, 1);
+    }
+
+    if (isHollow(choice)) {
+        throw upstreamFailure('The model returned an empty response', { retryable: true });
+    }
 
     return {
         content: choice?.message?.content ?? null,
